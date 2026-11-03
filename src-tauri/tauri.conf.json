@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MTrans",
+  "version": "1.0.0",
+  "identifier": "com.mondiro.mtrans",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "popup",
+        "url": "popup.html",
+        "title": "MTrans",
+        "width": 320,
+        "height": 46,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "shadow": true,
+        "backgroundColor": "#1F2126"
+      },
+      {
+        "label": "settings",
+        "url": "settings.html",
+        "title": "MTrans",
+        "width": 420,
+        "height": 600,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "center": true,
+        "shadow": true,
+        "backgroundColor": "#1F2126"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Mondiro",
+    "shortDescription": "Dịch nhanh tiếng Anh sang tiếng Việt",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

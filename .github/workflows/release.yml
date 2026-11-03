@@ -1,0 +1,76 @@
+name: Release
+
+# Builds the Windows installer and publishes a GitHub Release whenever the app
+# version in src-tauri/tauri.conf.json changes (or when started by hand).
+on:
+  push:
+    paths:
+      - 'src-tauri/tauri.conf.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version and release notes
+        id: meta
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          node -e "
+            const w = require('./src/whatsnew.json');
+            const parts = [['new','Mới'],['improved','Cải thiện'],['fixed','Sửa lỗi']]
+              .filter(([k]) => w[k] && w[k].length)
+              .map(([k,t]) => '### ' + t + '\n' + w[k].map(x => '- ' + x).join('\n'));
+            const body = parts.join('\n\n') +
+              '\n\n---\nTải file **MTrans_' + w.version + '_x64-setup.exe** bên dưới để cài. ' +
+              'Nếu đã cài, MTrans sẽ tự báo khi có bản mới.\n\n_Created by Mondiro_';
+            require('fs').writeFileSync('release-notes.md', body);
+          "
+          {
+            echo "notes<<NOTES_EOF"
+            cat release-notes.md
+            echo
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        if: steps.meta.outputs.exists == 'false'
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.meta.outputs.exists == 'false'
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.meta.outputs.exists == 'false'
+        with:
+          workspaces: src-tauri
+
+      - name: Install Tauri CLI
+        if: steps.meta.outputs.exists == 'false'
+        run: npm install
+
+      - uses: tauri-apps/tauri-action@v0
+        if: steps.meta.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: MTrans v__VERSION__
+          releaseBody: ${{ steps.meta.outputs.notes }}
+          releaseDraft: false
+          prerelease: false

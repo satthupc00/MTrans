@@ -1,0 +1,36 @@
+html,body{background:var(--chrome)}
+body{user-select:text}
+.pop{width:320px;max-height:460px;overflow:auto}
+.pop::-webkit-scrollbar{width:8px}
+.pop::-webkit-scrollbar-thumb{background:#474C55;border-radius:8px;border:2px solid var(--chrome)}
+.line{display:flex;align-items:baseline;gap:8px;padding:9px 10px 9px 12px;animation:fade .22s var(--ease-out)}
+@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.w{font-weight:700;color:#fff;font-size:14px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 0 auto}
+.ipa{color:var(--muted);font-size:12px;white-space:nowrap;flex:0 0 auto}
+.m{flex:1;color:#fff;min-width:0}
+.more{border:0;background:none;color:var(--muted);font-size:11.5px;font-weight:600;padding:2px 4px;border-radius:4px;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;align-self:center}
+.more:hover{color:var(--red)}
+.more svg{width:11px;height:11px;transition:transform var(--t-med) var(--ease-out)}
+.pop.open .more{color:var(--red)}
+.pop.open .more svg{transform:rotate(180deg)}
+.detail{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--t-med) var(--ease-out)}
+.pop.open .detail{grid-template-rows:1fr}
+.detail>div{overflow:hidden}
+.in{padding:10px 12px 12px;border-top:1px solid var(--line)}
+.pos{margin:0 0 8px}
+.pos:last-child{margin:0}
+.pos ol{margin:0;padding-left:18px}
+.pos li{margin:1px 0}
+.pos li b{color:#fff}
+.ex{margin:8px 0 0;padding:7px 10px;background:var(--panel);border-radius:6px;border-left:3px solid var(--red)}
+.ex .en{color:#fff;font-style:italic}
+.ex .vi{color:var(--muted)}
+.ex b{color:var(--red);font-weight:600}
+.sent{padding:10px 12px;color:#fff;font-size:13.5px;line-height:1.55;white-space:pre-wrap;animation:fade .22s var(--ease-out)}
+.caret{display:inline-block;width:6px;height:13px;background:var(--red);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.err{display:flex;gap:8px;align-items:center;padding:9px 10px 9px 12px}
+.err .dot{width:7px;height:7px;border-radius:50%;background:var(--warn);flex:0 0 auto}
+.err span{flex:1}
+.lnk{border:0;background:none;color:var(--red);font-weight:600;padding:2px 4px;border-radius:4px;white-space:nowrap}
+.lnk:hover{text-decoration:underline}

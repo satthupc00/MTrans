@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>MTrans</title>
+<link rel="stylesheet" href="common.css">
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<div class="win">
+  <div class="tb">
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-p="set">Cài đặt</button>
+      <button class="tab" data-p="help">Trợ giúp</button>
+      <span class="ind" id="ind"></span>
+    </div>
+    <div class="sp" data-tauri-drag-region></div>
+    <button class="cls" id="close" title="Đóng (Esc)" aria-label="Đóng"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.2"><path d="M1 1l10 10M11 1L1 11"/></svg></button>
+  </div>
+
+  <div class="pane on" id="p-set">
+    <div class="grp">
+      <label class="sw"><span>Dịch bằng phím tắt<small>Tắt tạm thời khi bạn không cần dịch</small></span><input type="checkbox" class="tg" id="enabled" aria-label="Bật dịch bằng phím tắt"></label>
+      <div class="seg" id="hotkey">
+        <button data-v="ctrl">Ctrl × 2</button><button data-v="alt">Alt × 2</button><button data-v="shift">Shift × 2</button>
+      </div>
+      <p class="hint">Bôi đen chữ rồi nhấn nhanh phím 2 lần.</p>
+    </div>
+
+    <div class="grp">
+      <label class="lbl" for="key">Claude API key</label>
+      <div class="field">
+        <input type="password" id="key" placeholder="Dán API key vào đây" spellcheck="false" autocomplete="off">
+        <button class="ibtn" id="eye" title="Hiện/ẩn key" aria-label="Hiện/ẩn key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <button class="btn sm" id="saveKey" title="Lưu và kiểm tra key (Enter)">Lưu</button>
+      </div>
+      <p class="hint" id="keyHint">&nbsp;</p>
+    </div>
+
+    <div class="grp">
+      <label class="lbl" for="model">Model dịch</label>
+      <select id="model">
+        <option value="claude-haiku-5-5">Haiku 5.5 — nhanh nhất, rẻ nhất (khuyên dùng)</option>
+        <option value="claude-sonnet-5-5">Sonnet 5.5 — dịch mượt hơn</option>
+        <option value="claude-opus-5-5">Opus 5.5 — mạnh nhất, chậm</option>
+      </select>
+    </div>
+
+    <div class="grp">
+      <label class="sw"><span>Khởi động cùng Windows</span><input type="checkbox" class="tg" id="autostart" aria-label="Khởi động cùng Windows"></label>
+    </div>
+
+    <div class="grp">
+      <span class="lbl">Phiên bản</span>
+      <div class="ver">
+        <span class="v" id="ver">v1.0.0</span><span class="latest" id="latest" hidden>latest</span><span class="newv" id="newv" hidden></span>
+        <span class="sp"></span>
+        <button class="btn" id="whatsnew" title="Xem thay đổi của bản này"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 10.7l-6.1 1.9L12 18.5l-1.9-5.9L4 10.7l6.1-1.9z"/><path d="M19 3v4M21 5h-4"/></svg>What's new</button>
+        <button class="btn pri" id="doUpdate" hidden>Cập nhật</button>
+        <button class="ibtn upd" id="upd" title="Kiểm tra cập nhật" aria-label="Kiểm tra cập nhật"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane help" id="p-help">
+    <div class="top"><img src="icon/logo.png" alt=""><b>MTrans</b></div>
+    <h4>Cách dùng</h4>
+    <ol>
+      <li>Bôi đen 1 từ hoặc 1 câu tiếng Anh (trên Chrome, PDF, Word…)</li>
+      <li>Nhấn nhanh <kbd>Ctrl</kbd> <kbd>Ctrl</kbd> → bản dịch hiện ngay cạnh chuột</li>
+      <li>Với 1 từ, bấm <b>More</b> để xem thêm nghĩa và câu ví dụ</li>
+      <li>Bấm ra ngoài hoặc nhấn <kbd>Esc</kbd> để đóng</li>
+    </ol>
+    <h4>Lấy API key</h4>
+    <ol>
+      <li>Vào <b>console.anthropic.com</b>, chọn tổ chức có credits (Individual Org)</li>
+      <li>Mở <b>API Keys → Create Key</b>, copy key</li>
+      <li>Dán vào tab Cài đặt → bấm <b>Lưu</b></li>
+    </ol>
+    <p>Chuột trái vào icon MTrans ở khay hệ thống để tạm tắt/bật lại. Chuột phải để mở menu.</p>
+    <div class="credit">Created by Mondiro</div>
+  </div>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="dlg" role="dialog" aria-label="What's new">
+    <div class="dh"><b>What's new</b><span id="wnVer"></span><span class="sp"></span>
+      <button class="ibtn" id="wnClose" title="Đóng (Esc)" aria-label="Đóng"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.4"><path d="M1 1l10 10M11 1L1 11"/></svg></button></div>
+    <div id="wnBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="settings.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+:root{
+  --chrome:#1F2126;--panel:#26292F;--line:#363A42;--hover:#2F333A;--stage:#2B2D31;
+  --text:#E8E9EC;--muted:#8D929C;--red:#E5383B;--warn:#F2B84B;--selected-bg:#3A2426;--green:#2EB872;
+  --ease-out:cubic-bezier(.22,1,.36,1);--ease-spring:cubic-bezier(.34,1.56,.64,1);--t-fast:.12s;--t-med:.22s;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--chrome);color:var(--text);font:13px/1.45 "Segoe UI",system-ui,sans-serif;overflow:hidden;user-select:none}
+:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+button{font:inherit;cursor:pointer;
+  transition:background-color var(--t-fast) ease,border-color var(--t-fast) ease,color var(--t-fast) ease,
+    box-shadow var(--t-med) var(--ease-out),transform var(--t-med) var(--ease-out),opacity var(--t-fast) ease}
+button:not(:disabled):active{transform:scale(.95);transition-duration:.06s}
+button:disabled{opacity:.45;cursor:default}
+.chip{display:inline-block;font-size:10.5px;font-weight:700;color:var(--red);background:var(--selected-bg);border-radius:5px;padding:1px 7px;margin:0 0 3px}
+.load{display:inline-flex;gap:4px;padding:6px 0;vertical-align:middle}
+.load i{width:5px;height:5px;border-radius:50%;background:var(--muted);animation:dot 1s infinite}
+.load i:nth-child(2){animation-delay:.15s}.load i:nth-child(3){animation-delay:.3s}
+@keyframes dot{50%{opacity:.25;transform:translateY(-2px)}}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
