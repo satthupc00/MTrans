@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MTrans – Layout preview</title>
+<style>
+:root{
+  --chrome:#1F2126;--panel:#26292F;--line:#363A42;--hover:#2F333A;--stage:#2B2D31;
+  --text:#E8E9EC;--muted:#8D929C;--red:#E5383B;--warn:#F2B84B;--selected-bg:#3A2426;--green:#2EB872;
+  --ease-out:cubic-bezier(.22,1,.36,1);--ease-spring:cubic-bezier(.34,1.56,.64,1);--t-fast:.12s;--t-med:.22s;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#15161A;color:var(--text);font:13px/1.45 "Segoe UI",system-ui,sans-serif}
+.page{max-width:1180px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:20px;margin:0 0 4px}
+.lead{color:var(--muted);margin:0 0 26px}
+.sec{margin:0 0 40px}
+.sec>h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.sec>h2 .n{background:var(--red);color:#fff;border-radius:50%;width:20px;height:20px;display:grid;place-items:center;font-size:11px}
+.sec>p{color:var(--muted);margin:0 0 14px;max-width:760px}
+.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+button{font:inherit;cursor:pointer;transition:background-color var(--t-fast),border-color var(--t-fast),color var(--t-fast),transform var(--t-med) var(--ease-out),box-shadow var(--t-med) var(--ease-out)}
+button:not(:disabled):active{transform:scale(.95);transition-duration:.06s}
+:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+
+/* ---------- mock chrome ---------- */
+.browser{width:640px;max-width:100%;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.5);position:relative;color:#202124}
+.browser .bar{background:#DEE1E6;height:38px;display:flex;align-items:center;gap:8px;padding:0 12px}
+.browser .bar i{width:11px;height:11px;border-radius:50%;background:#bbb}
+.browser .url{flex:1;height:24px;background:#fff;border-radius:12px;margin-left:10px;font-size:11px;color:#666;display:flex;align-items:center;padding:0 12px}
+.browser .content{padding:26px 30px 430px;font:15px/1.7 Georgia,serif}
+.browser .content h3{font:600 20px/1.3 "Segoe UI",sans-serif;margin:0 0 10px}
+.hl{background:#B4D5FE}
+
+/* ---------- trigger icon ---------- */
+.trig{position:absolute;width:28px;height:28px;border-radius:8px;background:var(--chrome);border:1px solid var(--line);
+  box-shadow:0 4px 12px rgba(0,0,0,.35);display:grid;place-items:center;padding:0;animation:pop .28s var(--ease-spring)}
+.trig:hover{border-color:var(--red);transform:translateY(-1px)}
+.logo-ph{width:18px;height:18px;border:1.5px dashed #6B707A;border-radius:4px;display:grid;place-items:center;font:700 9px "Segoe UI";color:#8D929C}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+
+/* ---------- popup ---------- */
+.pop{width:360px;background:var(--chrome);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 36px rgba(0,0,0,.5);
+  color:var(--text);font:13px/1.5 "Segoe UI",system-ui,sans-serif;overflow:hidden;animation:popin .32s var(--ease-spring)}
+.browser .pop{position:absolute}
+@keyframes popin{from{transform:translateY(8px) scale(.96);opacity:0}to{transform:none;opacity:1}}
+.pop .src{padding:12px 14px 10px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.pop .w{font-size:18px;font-weight:700;color:#fff}
+.pop .ipa{color:var(--muted);font-size:13px}
+.pop .src.sent{display:block;color:var(--muted);font-size:12px}
+.pop .src.sent span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pop .body{padding:10px 14px 12px;max-height:300px;overflow:auto}
+.pos{margin:0 0 8px}
+.pos:last-child{margin:0}
+.chip{display:inline-block;font-size:10.5px;font-weight:700;color:var(--red);background:var(--selected-bg);border-radius:5px;padding:1px 7px;margin:0 0 4px}
+.pos ol{margin:0;padding-left:18px}
+.pos li{margin:1px 0}
+.ex{margin:10px 0 0;padding:8px 10px;background:var(--panel);border-radius:6px;border-left:3px solid var(--red)}
+.ex .en{color:#fff;font-style:italic}
+.ex .vi{color:var(--muted)}
+.ex b{color:var(--red);font-weight:600}
+.trans{font-size:14px;color:#fff;line-height:1.6}
+.caret{display:inline-block;width:7px;height:14px;background:var(--red);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.pop .foot{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 6px 14px;border-top:1px solid var(--line);color:#6B707A;font-size:11px}
+.ibtn{width:28px;height:28px;border:1px solid transparent;border-radius:6px;background:none;color:var(--muted);display:grid;place-items:center;padding:0}
+.ibtn:hover{border-color:var(--red);color:#fff;transform:translateY(-1px)}
+.ibtn svg{width:15px;height:15px}
+.err{display:flex;gap:10px;align-items:flex-start;color:var(--text)}
+.err .dot{width:8px;height:8px;border-radius:50%;background:var(--warn);margin-top:6px;flex:0 0 auto}
+.btn{height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text)}
+.btn:hover{border-color:var(--red);transform:translateY(-1px)}
+.btn.pri{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+.btn.pri:hover{background:#F04447;box-shadow:0 6px 16px rgba(229,56,59,.35)}
+
+/* ---------- small window (settings/help) ---------- */
+.win{width:440px;max-width:100%;background:var(--chrome);border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.tb{height:40px;display:flex;align-items:stretch;border-bottom:1px solid var(--line)}
+.tabs{display:flex;position:relative;padding-left:6px}
+.tab{background:none;border:0;color:var(--muted);padding:0 14px;font-weight:600}
+.tab:hover{color:#fff}
+.tab.on{color:#fff}
+.tabs .ind{position:absolute;bottom:-1px;height:2px;background:var(--red);transition:left var(--t-med) var(--ease-out),width var(--t-med) var(--ease-out)}
+.tb .sp{flex:1}
+.tb .cls{width:46px;border:0;background:none;color:#fff;display:grid;place-items:center}
+.tb .cls:hover{background:#C42B1C}
+.tb .cls svg{width:12px;height:12px}
+.pane{padding:16px 18px 18px;display:none}
+.pane.on{display:block}
+.grp{margin:0 0 18px}
+.grp:last-child{margin:0}
+.lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 7px}
+.field{display:flex;align-items:center;gap:4px;height:36px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:0 4px 0 10px;transition:border-color var(--t-fast),box-shadow var(--t-med)}
+.field:focus-within{border-color:var(--red);box-shadow:0 0 0 3px rgba(229,56,59,.18)}
+.field input{flex:1;min-width:0;border:0;outline:0;background:none;color:var(--text);font:inherit;letter-spacing:.04em}
+.hint{color:var(--muted);font-size:11.5px;margin:6px 0 0}
+.hint.ok{color:var(--green)}
+select{width:100%;height:36px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--text);font:inherit;padding:0 10px}
+select:focus{border-color:var(--red);outline:0;box-shadow:0 0 0 3px rgba(229,56,59,.18)}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px;gap:3px}
+.seg button{flex:1;height:28px;border:0;border-radius:4px;background:none;color:var(--muted);font-size:12px}
+.seg button:hover{color:#fff}
+.seg button.on{background:var(--selected-bg);color:#fff;box-shadow:inset 0 0 0 1px var(--red)}
+.chk{display:flex;align-items:center;gap:9px;margin:0 0 8px;cursor:pointer}
+input[type=checkbox]{appearance:none;width:16px;height:16px;margin:0;border:1.5px solid #5A5F69;border-radius:4px;background:var(--panel);display:inline-grid;place-content:center;cursor:pointer;transition:background-color var(--t-fast),border-color var(--t-fast)}
+input[type=checkbox]::after{content:'';width:9px;height:5px;border:2px solid #fff;border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg) scale(0);transition:transform var(--t-med) var(--ease-spring)}
+input[type=checkbox]:hover{border-color:var(--red)}
+input[type=checkbox]:checked{background:var(--red);border-color:var(--red)}
+input[type=checkbox]:checked::after{transform:translateY(-1px) rotate(-45deg) scale(1)}
+.ver{display:flex;align-items:center;gap:8px}
+.ver .v{font-weight:700;font-variant-numeric:tabular-nums}
+.latest{font-size:10.5px;font-weight:800;color:var(--green);background:#2eb87224;padding:1px 7px;border-radius:20px;animation:pop .32s var(--ease-spring)}
+.ver .sp{flex:1}
+.upd.ok{color:var(--green)}
+.help h4{margin:0 0 6px;font-size:13px;color:#fff}
+.help p,.help ol{margin:0 0 14px;color:#C9CCD2}
+.help ol{padding-left:18px}
+kbd{font:600 11px "Segoe UI";background:var(--panel);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 6px;color:#fff}
+.credit{color:#6B707A;font-size:11px;text-align:right;margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+
+/* ---------- tray ---------- */
+.taskbar{width:420px;max-width:100%;background:#202020;border-radius:8px;padding:10px;position:relative;height:240px;display:flex;flex-direction:column;justify-content:flex-end}
+.tbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;height:40px;border-top:1px solid #333;padding:0 10px;color:#ddd;font-size:11px}
+.tray-ic{width:26px;height:26px;border-radius:4px;display:grid;place-items:center;background:#3a3a3a}
+.menu{position:absolute;right:60px;bottom:52px;width:220px;background:#2B2B2B;border:1px solid #3d3d3d;border-radius:8px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.5);color:#eee;font-size:12.5px}
+.menu div{padding:7px 12px;border-radius:4px;display:flex;justify-content:space-between}
+.menu div:hover{background:#3a3a3a}
+.menu hr{border:0;border-top:1px solid #3d3d3d;margin:4px 0}
+.menu .k{color:#999}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;max-width:520px;color:#C9CCD2}
+.note b{color:#fff}
+.note ul{margin:6px 0 0;padding-left:18px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>MTrans · Layout preview</h1>
+  <p class="lead">Bản xem trước giao diện (chưa có tính năng thật). Logo đang để ô trống nét đứt, khi bạn gửi logo mình sẽ thay vào.</p>
+
+  <!-- 1 -->
+  <section class="sec">
+    <h2><span class="n">1</span>Bôi đen 1 từ → nhấn Ctrl 2 lần → hiện icon → bấm icon → popup</h2>
+    <p>Icon nhỏ hiện ngay cạnh con trỏ chuột. Sau 4 giây không bấm thì icon tự ẩn. Popup đóng khi bấm ra ngoài hoặc nhấn <kbd>Esc</kbd>. Chữ dịch hiện dần ra (kiểu gõ chữ) để không phải chờ.</p>
+    <div class="row">
+      <div class="browser">
+        <div class="bar"><i></i><i></i><i></i><div class="url">esotericsoftware.com/spine-meshes</div></div>
+        <div class="content">
+          <h3>Meshes and weights</h3>
+          Before you start animating, you need to <span class="hl">rig</span> the character by binding mesh vertices to bones, so the skeleton can deform the image smoothly.
+        </div>
+        <button class="trig" style="left:262px;top:150px" title="Dịch (MTrans)"><span class="logo-ph">logo</span></button>
+        <div class="pop" style="left:150px;top:184px">
+          <div class="src"><span class="w">rig</span><span class="ipa">/rɪɡ/</span></div>
+          <div class="body">
+            <div class="pos"><span class="chip">động từ</span>
+              <ol><li><b>dựng khung xương</b> (cho nhân vật để làm animation)</li><li>lắp đặt, trang bị (thiết bị)</li><li>gian lận, sắp đặt trước (kết quả)</li></ol></div>
+            <div class="pos"><span class="chip">danh từ</span>
+              <ol><li>bộ khung xương / bộ điều khiển của nhân vật</li><li>giàn khoan</li></ol></div>
+            <div class="ex"><div class="en">You need to <b>rig</b> the character before animating.</div><div class="vi">Bạn cần dựng xương cho nhân vật trước khi làm animation.</div></div>
+          </div>
+          <div class="foot"><span>Haiku 5.5</span>
+            <button class="ibtn" title="Copy bản dịch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="note"><b>Khi tra 1 từ</b>, popup hiện:
+        <ul><li>Từ + phiên âm IPA</li><li>Nghĩa chia theo loại từ. Nghĩa đúng với câu đang đọc được in đậm và xếp lên đầu (ở đây là "dựng khung xương" vì trang đang nói về Spine)</li><li>1 câu ví dụ Anh + Việt</li><li>Góc dưới: tên model đang dùng + nút copy (nút nhỏ, có thể bỏ nếu bạn không cần)</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="sec">
+    <h2><span class="n">2</span>Bôi đen cả câu / đoạn</h2>
+    <p>Dòng trên hiện câu gốc thu nhỏ (tối đa 2 dòng), bên dưới là bản dịch tiếng Việt to, rõ.</p>
+    <div class="row">
+      <div class="pop" style="animation:none">
+        <div class="src sent"><span>Before you start animating, you need to rig the character by binding mesh vertices to bones, so the skeleton can deform the image smoothly.</span></div>
+        <div class="body"><div class="trans">Trước khi bắt đầu làm animation, bạn cần dựng xương cho nhân vật bằng cách gắn các đỉnh của mesh vào bone, để bộ xương có thể biến dạng hình ảnh một cách mượt mà.</div></div>
+        <div class="foot"><span>Haiku 5.5</span><button class="ibtn" title="Copy bản dịch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+      </div>
+      <div class="pop" style="animation:none">
+        <div class="src sent"><span>Spine supports weighted meshes and free-form deformation.</span></div>
+        <div class="body"><div class="trans">Spine hỗ trợ mesh có trọng số và biến dạng<span class="caret"></span></div></div>
+        <div class="foot"><span>Đang dịch…</span><span></span></div>
+      </div>
+      <div class="pop" style="animation:none">
+        <div class="body"><div class="err"><span class="dot"></span><div>Chưa có API key. Mở Cài đặt và dán key vào để bắt đầu dịch.<div style="margin-top:10px"><button class="btn pri">Mở Cài đặt</button></div></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="sec">
+    <h2><span class="n">3</span>Icon ở khay hệ thống (góc phải taskbar)</h2>
+    <p>Chuột phải vào icon để mở menu. Chuột trái 1 lần để tạm tắt hoặc bật lại MTrans (khi tắt, icon chuyển sang màu xám).</p>
+    <div class="row">
+      <div class="taskbar">
+        <div class="menu">
+          <div><span>✓ Đang bật</span><span class="k"></span></div>
+          <hr>
+          <div><span>Cài đặt</span></div>
+          <div><span>Trợ giúp</span></div>
+          <div><span>Kiểm tra cập nhật</span></div>
+          <hr>
+          <div><span>Thoát MTrans</span></div>
+        </div>
+        <div class="tbar"><span>^</span><span class="tray-ic"><span class="logo-ph" style="width:16px;height:16px;font-size:7px">logo</span></span><span>ENG</span><span>10:24<br>03/11/2026</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="sec">
+    <h2><span class="n">4</span>Cửa sổ Cài đặt / Trợ giúp</h2>
+    <p>Cửa sổ nhỏ, không có logo hay tiêu đề trên header, chỉ có 2 tab và nút đóng. Kéo được cửa sổ bằng thanh trên cùng. Vì không có tên app trên header, chữ <span style="color:var(--green);font-weight:700">latest</span> sẽ hiện cạnh số phiên bản trong mục Phiên bản.</p>
+    <div class="row">
+      <div class="win" id="win">
+        <div class="tb">
+          <div class="tabs" id="tabs">
+            <button class="tab on" data-p="set">Cài đặt</button>
+            <button class="tab" data-p="help">Trợ giúp</button>
+            <span class="ind" id="ind"></span>
+          </div>
+          <div class="sp"></div>
+          <button class="cls" title="Đóng (Esc)"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.2"><path d="M1 1l10 10M11 1L1 11"/></svg></button>
+        </div>
+        <div class="pane on" id="p-set">
+          <div class="grp"><label class="lbl">Claude API key</label>
+            <div class="field"><input type="password" value="sk-ant-api03-xxxxxxxxxxxxxxxxxxxx" aria-label="API key">
+              <button class="ibtn" title="Hiện/ẩn key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="btn" style="height:28px">Kiểm tra</button></div>
+            <p class="hint ok">✓ Key hoạt động</p>
+          </div>
+          <div class="grp"><label class="lbl">Model dịch</label>
+            <select><option>Haiku 5.5 — nhanh nhất, rẻ nhất (khuyên dùng)</option><option>Sonnet 5.5 — dịch mượt hơn</option><option>Opus 5.5 — mạnh nhất, chậm</option></select>
+          </div>
+          <div class="grp"><label class="lbl">Phím gọi dịch</label>
+            <div class="seg"><button class="on">Ctrl × 2</button><button>Alt × 2</button><button>Shift × 2</button></div>
+            <p class="hint">Bôi đen chữ rồi nhấn nhanh phím 2 lần.</p>
+          </div>
+          <div class="grp"><span class="lbl">Tuỳ chọn</span>
+            <label class="chk"><input type="checkbox" checked> Khởi động cùng Windows</label>
+            <label class="chk"><input type="checkbox"> Bỏ qua icon, mở popup dịch luôn</label>
+          </div>
+          <div class="grp"><span class="lbl">Phiên bản</span>
+            <div class="ver"><span class="v">v0.1.0</span><span class="latest">latest</span><span class="sp"></span>
+              <button class="btn" title="Xem thay đổi của bản này">✦ What's new</button>
+              <button class="ibtn upd ok" title="Kiểm tra cập nhật · Đã là bản mới nhất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="pane help" id="p-help">
+          <h4>Cách dùng</h4>
+          <ol><li>Bôi đen 1 từ hoặc 1 câu tiếng Anh (trên Chrome, PDF, Word…)</li><li>Nhấn nhanh <kbd>Ctrl</kbd> <kbd>Ctrl</kbd></li><li>Bấm vào icon MTrans hiện cạnh chuột để xem bản dịch</li></ol>
+          <h4>Lấy API key</h4>
+          <ol><li>Vào <b>console.anthropic.com</b>, chọn đúng tổ chức (Individual Org) có credits</li><li>Mở <b>API Keys → Create Key</b>, copy key</li><li>Dán vào tab Cài đặt → bấm Kiểm tra</li></ol>
+          <p>Mỗi lần dịch tốn khoảng 0,0001–0,005$ tuỳ model, trừ vào credits của bạn.</p>
+          <div class="credit">Created by Mondiro</div>
+        </div>
+      </div>
+      <div class="note"><b>Đề xuất thêm (tuỳ bạn):</b>
+        <ul>
+          <li><b>"Bỏ qua icon, mở popup dịch luôn"</b>: nhấn Ctrl×2 là popup hiện ngay, đỡ 1 lần bấm. Mặc định tắt, đúng như bạn mô tả.</li>
+          <li><b>Chọn phím</b> Ctrl/Alt/Shift × 2 phòng khi Ctrl×2 bị trùng với app khác bạn đang dùng.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+const tabs=document.getElementById('tabs'),ind=document.getElementById('ind');
+function place(t){ind.style.left=t.offsetLeft+'px';ind.style.width=t.offsetWidth+'px'}
+tabs.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  tabs.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+t.dataset.p));place(t)});
+place(tabs.querySelector('.tab.on'));
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>b.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)));
+</script>
+</body>
+</html>
