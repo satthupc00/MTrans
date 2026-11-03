@@ -327,6 +327,12 @@ mod imp {
         }
     }
 
+    pub fn hide_window(hwnd_raw: isize) {
+        unsafe {
+            let _ = ShowWindow(HWND(hwnd_raw as _), SW_HIDE);
+        }
+    }
+
     pub fn protect(data: &[u8]) -> Option<Vec<u8>> {
         unsafe {
             let input = CRYPT_INTEGER_BLOB { cbData: data.len() as u32, pbData: data.as_ptr() as *mut u8 };
@@ -362,6 +368,7 @@ mod stub {
         None
     }
     pub fn show_no_activate(_hwnd: isize) {}
+    pub fn hide_window(_hwnd: isize) {}
     pub fn protect(d: &[u8]) -> Option<Vec<u8>> {
         Some(d.to_vec())
     }

@@ -101,7 +101,14 @@ fn popup_begin(app: &AppHandle, text: String) {
 fn popup_hide_inner(app: &AppHandle) {
     win::POPUP_VISIBLE.store(false, Ordering::Relaxed);
     if let Some(w) = app.get_webview_window("popup") {
-        let _ = w.hide();
+        // The popup is shown with a raw ShowWindow call (so it does not steal focus),
+        // which the window library does not know about; hide it the same way.
+        match w.hwnd() {
+            Ok(h) => win::hide_window(h.0 as isize),
+            Err(_) => {
+                let _ = w.hide();
+            }
+        }
     }
 }
 

@@ -1,14 +1,9 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "date": "2026-11-03",
-  "new": [
-    "Bôi đen chữ tiếng Anh rồi nhấn nhanh Ctrl 2 lần để dịch ngay cạnh chuột",
-    "Tra 1 từ: hiện phiên âm và nghĩa gọn, bấm More để xem thêm nghĩa theo loại từ và câu ví dụ",
-    "Dịch cả câu/đoạn, chữ hiện dần trong lúc dịch",
-    "Chọn model dịch Haiku / Sonnet / Opus, đổi phím gọi Ctrl / Alt / Shift × 2",
-    "Nhớ các từ đã tra, lần sau hiện ngay không tốn credits",
-    "Icon ở khay hệ thống: bấm để tạm tắt/bật, tự kiểm tra và cài bản mới"
-  ],
+  "new": [],
   "improved": [],
-  "fixed": []
+  "fixed": [
+    "Nhấn Esc hoặc bấm ra ngoài giờ đã đóng được popup dịch"
+  ]
 }
