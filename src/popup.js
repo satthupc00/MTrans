@@ -4,16 +4,24 @@ const { listen } = window.__TAURI__.event;
 const pop = document.getElementById('pop');
 let cur = 0; // id of the request on screen; late chunks from older ones are ignored
 let fitQueued = false;
+let lastH = 0;
 
-function fit() {
+// While the popup window is hidden the page is in the background, so timers and
+// animation frames may be delayed a lot. Measure synchronously (layout still works)
+// and send the size right away; a microtask only merges several calls in one turn.
+function fit(force) {
+  if (force === true) lastH = 0;
   if (fitQueued) return;
   fitQueued = true;
-  requestAnimationFrame(() => {
+  queueMicrotask(() => {
     fitQueued = false;
-    invoke('popup_resize', { height: Math.ceil(pop.getBoundingClientRect().height) });
+    const h = Math.ceil(pop.getBoundingClientRect().height);
+    if (h === lastH) return;
+    lastH = h;
+    invoke('popup_resize', { height: h });
   });
 }
-new ResizeObserver(fit).observe(pop);
+new ResizeObserver(() => fit()).observe(pop);
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -51,7 +59,7 @@ function showError(e) {
     row.append(el('span', null, String(e || 'Có lỗi xảy ra')));
   }
   pop.append(row);
-  fit();
+  fit(true);
 }
 
 // ---------- single word ----------
@@ -125,7 +133,7 @@ function startWord(text, seq) {
   wrap.append(inner);
   detail.append(wrap);
   pop.append(line, detail);
-  fit();
+  fit(true);
 
   run('short', text, seq, (t, done) => {
     const r = parseShort(t);
@@ -155,7 +163,7 @@ function startSentence(text, seq) {
   const box = el('div', 'sent');
   box.append(dots());
   pop.append(box);
-  fit();
+  fit(true);
   run('sentence', text, seq, (t, done) => {
     box.textContent = t;
     if (!done) box.append(el('span', 'caret'));
