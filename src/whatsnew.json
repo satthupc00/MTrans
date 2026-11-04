@@ -1,13 +1,13 @@
 {
-  "version": "1.1.1",
+  "version": "1.2.0",
   "date": "2026-11-04",
   "new": [
-    "Nút \"Dịch với Claude\" ngay trong popup: cạnh chữ More, ở góc dưới khi mở rộng, và dưới bản dịch câu/ảnh"
+    "Tự đặt phím tắt cho dịch chữ bôi đen và dịch vùng màn hình: chọn Ctrl / Alt / Shift ở ô trái, gõ phím ở ô phải (vd Alt + Q)",
+    "Để trống ô bên phải = nhấn nhanh 2 lần như trước (Ctrl × 2, Shift × 2)"
   ],
   "improved": [
-    "Mặc định luôn dịch bằng Google cho nhanh; chỉ dùng Claude khi bạn bấm nút",
-    "Cài đặt gọn hơn: bỏ mục chọn nguồn dịch, chỉ cần nhập API key nếu muốn dùng Claude",
-    "Khi đổi sang Claude, bản dịch Google vẫn hiện mờ trong lúc chờ"
+    "Báo ngay khi phím tắt trùng nhau hoặc trùng phím hay dùng (Ctrl + C, Ctrl + V…)",
+    "Menu ở khay hệ thống hiện phím tắt đang dùng"
   ],
   "fixed": []
 }

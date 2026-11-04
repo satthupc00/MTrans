@@ -1,5 +1,6 @@
 mod claude;
 mod google;
+mod hotkey;
 mod settings;
 mod updater;
 mod win;
@@ -53,6 +54,7 @@ struct PopupState {
 struct Tray {
     icon: TrayIcon<Wry>,
     toggle: CheckMenuItem<Wry>,
+    capture: MenuItem<Wry>,
     update: MenuItem<Wry>,
 }
 
@@ -372,7 +374,12 @@ fn refresh_tray(app: &AppHandle) {
     let tray = state.tray.lock().unwrap();
     if let Some(t) = tray.as_ref() {
         let _ = t.toggle.set_checked(s.enabled);
-        let _ = t.toggle.set_text(format!("Dịch bằng {} × 2", s.hotkey_label()));
+        let _ = t.toggle.set_text(format!("Dịch chữ bôi đen ({})", s.text_key.label()));
+        let _ = t.capture.set_text(if s.capture_enabled {
+            format!("Chọn vùng màn hình để dịch ({})", s.capture_key.label())
+        } else {
+            "Chọn vùng màn hình để dịch".to_string()
+        });
         let bytes = if s.enabled { TRAY_ON } else { TRAY_OFF };
         if let Ok(img) = Image::from_bytes(bytes) {
             let _ = t.icon.set_icon(Some(img));
@@ -408,7 +415,7 @@ fn set_enabled_inner(app: &AppHandle, on: bool) {
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let s = app.state::<AppState>().settings.lock().unwrap().clone();
-    let toggle = CheckMenuItem::with_id(app, "toggle", format!("Dịch bằng {} × 2", s.hotkey_label()), true, s.enabled, None::<&str>)?;
+    let toggle = CheckMenuItem::with_id(app, "toggle", format!("Dịch chữ bôi đen ({})", s.text_key.label()), true, s.enabled, None::<&str>)?;
     let capture = MenuItem::with_id(app, "capture", "Chọn vùng màn hình để dịch", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
     let help = MenuItem::with_id(app, "help", "Trợ giúp", true, None::<&str>)?;
@@ -445,7 +452,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             }
         })
         .build(app)?;
-    *app.state::<AppState>().tray.lock().unwrap() = Some(Tray { icon, toggle, update });
+    *app.state::<AppState>().tray.lock().unwrap() = Some(Tray { icon, toggle, capture, update });
     refresh_tray(app);
     Ok(())
 }
@@ -453,9 +460,23 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 // ---------------------------------------------------------------- commands
 
 #[derive(Serialize)]
+struct KeyView {
+    mods: u8,
+    vk: u16,
+    label: String,
+}
+
+impl From<hotkey::Hotkey> for KeyView {
+    fn from(h: hotkey::Hotkey) -> Self {
+        KeyView { mods: h.mods, vk: h.vk, label: h.label() }
+    }
+}
+
+#[derive(Serialize)]
 struct SettingsView {
     enabled: bool,
-    hotkey: String,
+    text_key: KeyView,
+    capture_key: KeyView,
     capture_enabled: bool,
     model: String,
     has_key: bool,
@@ -477,7 +498,8 @@ fn get_settings(app: AppHandle, state: State<AppState>) -> SettingsView {
         .unwrap_or_default();
     SettingsView {
         enabled: s.enabled,
-        hotkey: s.hotkey.clone(),
+        text_key: s.text_key.into(),
+        capture_key: s.capture_key.into(),
         capture_enabled: s.capture_enabled,
         model: s.model.clone(),
         has_key: key.is_some(),
@@ -492,15 +514,38 @@ fn set_enabled(app: AppHandle, on: bool) {
     set_enabled_inner(&app, on);
 }
 
+/// Change a shortcut. Returns a warning to show (may be empty) or an error.
 #[tauri::command]
-fn set_hotkey(app: AppHandle, state: State<AppState>, hotkey: String) {
+fn set_hotkey(app: AppHandle, state: State<AppState>, which: String, mods: u8, vk: u16) -> Result<String, String> {
+    let hk = hotkey::Hotkey { mods, vk };
+    let warn = hk.check()?;
     {
         let mut s = state.settings.lock().unwrap();
-        s.hotkey = if hotkey == "alt" { "alt".into() } else { "ctrl".into() };
-        win::MODIFIER.store(win::modifier_code(&s.hotkey), Ordering::Relaxed);
+        let other = if which == "capture" { s.text_key } else { s.capture_key };
+        if other == hk {
+            return Err(format!(
+                "{} đang dùng cho {}. Hãy chọn phím khác.",
+                hk.label(),
+                if which == "capture" { "dịch chữ bôi đen" } else { "dịch vùng màn hình" }
+            ));
+        }
+        if which == "capture" {
+            s.capture_key = hk;
+            win::CAPTURE_KEY.store(hk.pack(), Ordering::Relaxed);
+        } else {
+            s.text_key = hk;
+            win::TEXT_KEY.store(hk.pack(), Ordering::Relaxed);
+        }
         s.save(&app);
     }
     refresh_tray(&app);
+    Ok(warn)
+}
+
+/// While Settings records a new shortcut, the hook lets every key through.
+#[tauri::command]
+fn set_hooks_paused(on: bool) {
+    win::PAUSED.store(on, Ordering::Relaxed);
 }
 
 #[tauri::command]
@@ -690,7 +735,8 @@ pub fn run() {
             let handle = app.handle().clone();
             let mut s = Settings::load(&handle);
             win::ENABLED.store(s.enabled, Ordering::Relaxed);
-            win::MODIFIER.store(win::modifier_code(&s.hotkey), Ordering::Relaxed);
+            win::TEXT_KEY.store(s.text_key.pack(), Ordering::Relaxed);
+            win::CAPTURE_KEY.store(s.capture_key.pack(), Ordering::Relaxed);
             win::CAPTURE_ENABLED.store(s.capture_enabled, Ordering::Relaxed);
             let first_run = !s.first_run_done;
             if first_run {
@@ -766,6 +812,7 @@ pub fn run() {
             get_settings,
             set_enabled,
             set_hotkey,
+            set_hooks_paused,
             set_model,
             set_autostart,
             save_api_key,

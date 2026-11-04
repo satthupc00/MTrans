@@ -2,7 +2,7 @@
 //! DPAPI for the API key, and showing the popup without stealing focus.
 //! Non-Windows builds get no-op stubs so the crate still type-checks.
 
-use std::sync::atomic::{AtomicBool, AtomicU8};
+use std::sync::atomic::{AtomicBool, AtomicU32};
 
 pub enum HookEvent {
     /// The "translate selection" key was double-tapped.
@@ -15,23 +15,19 @@ pub enum HookEvent {
     Escape,
 }
 
-/// Double-tap on the text key translates the selection.
+/// Translating the selection is on.
 pub static ENABLED: AtomicBool = AtomicBool::new(true);
-/// Double-tap Shift starts a screen-region translation.
+/// Picking a screen region is on.
 pub static CAPTURE_ENABLED: AtomicBool = AtomicBool::new(true);
-/// Text key: 0 = Ctrl, 1 = Alt.
-pub static MODIFIER: AtomicU8 = AtomicU8::new(0);
+/// Packed `Hotkey` (mods << 16 | vk) for each action.
+pub static TEXT_KEY: AtomicU32 = AtomicU32::new(0x0001_0000);
+pub static CAPTURE_KEY: AtomicU32 = AtomicU32::new(0x0004_0000);
+/// Settings is recording a new shortcut: let every key through untouched.
+pub static PAUSED: AtomicBool = AtomicBool::new(false);
 /// The popup is on screen (mouse clicks / Esc are reported only then).
 pub static POPUP_VISIBLE: AtomicBool = AtomicBool::new(false);
 /// The region picker is on screen (Esc is reported).
 pub static CAPTURE_VISIBLE: AtomicBool = AtomicBool::new(false);
-
-pub fn modifier_code(name: &str) -> u8 {
-    match name {
-        "alt" => 1,
-        _ => 0,
-    }
-}
 
 #[cfg(windows)]
 pub use imp::*;
@@ -66,14 +62,18 @@ mod imp {
         }
     }
 
+    use crate::hotkey::{Hotkey, ALT, CTRL, SHIFT};
+
     #[derive(Default)]
     struct Tap {
-        /// Key class being held: 1 = text key, 2 = Shift (capture).
+        /// Action whose modifier is held for a double tap: 1 = text, 2 = capture.
         held: u8,
         clean: bool,
         down_at: u32,
-        /// (class, time) of the previous clean tap.
+        /// (action, time) of the previous clean tap.
         last_tap: Option<(u8, u32)>,
+        /// A key we swallowed on key-down; its repeats and key-up are swallowed too.
+        swallowed: u32,
     }
 
     thread_local! {
@@ -92,20 +92,81 @@ mod imp {
     fn is_shift(vk: u32) -> bool {
         vk == VK_SHIFT.0 as u32 || vk == VK_LSHIFT.0 as u32 || vk == VK_RSHIFT.0 as u32
     }
+    fn is_win(vk: u32) -> bool {
+        vk == VK_LWIN.0 as u32 || vk == VK_RWIN.0 as u32
+    }
+    fn is_modifier(vk: u32) -> bool {
+        is_ctrl(vk) || is_alt(vk) || is_shift(vk) || is_win(vk)
+    }
 
-    /// Which tap class a key belongs to right now (0 = none).
-    fn class_of(vk: u32) -> u8 {
-        let text_on = ENABLED.load(Ordering::Relaxed);
-        let text_key = match MODIFIER.load(Ordering::Relaxed) {
-            1 => is_alt(vk),
-            _ => is_ctrl(vk),
-        };
-        if text_on && text_key {
-            1
-        } else if CAPTURE_ENABLED.load(Ordering::Relaxed) && is_shift(vk) {
-            2
+    fn down(vk: VIRTUAL_KEY) -> bool {
+        unsafe { (GetAsyncKeyState(vk.0 as i32) as u16 & 0x8000) != 0 }
+    }
+
+    /// Modifiers held right now (Win counts as "other" so Win+… never matches).
+    fn mods_now() -> (u8, bool) {
+        let mut m = 0;
+        if down(VK_CONTROL) {
+            m |= CTRL;
+        }
+        if down(VK_MENU) {
+            m |= ALT;
+        }
+        if down(VK_SHIFT) {
+            m |= SHIFT;
+        }
+        (m, down(VK_LWIN) || down(VK_RWIN))
+    }
+
+    fn bindings() -> [(u8, Hotkey); 2] {
+        let text = if ENABLED.load(Ordering::Relaxed) {
+            Hotkey::unpack(TEXT_KEY.load(Ordering::Relaxed))
         } else {
-            0
+            Hotkey { mods: 0xFF, vk: 0xFFFF }
+        };
+        let cap = if CAPTURE_ENABLED.load(Ordering::Relaxed) {
+            Hotkey::unpack(CAPTURE_KEY.load(Ordering::Relaxed))
+        } else {
+            Hotkey { mods: 0xFF, vk: 0xFFFF }
+        };
+        [(1, text), (2, cap)]
+    }
+
+    /// Double-tap action a modifier key belongs to (0 = none).
+    fn tap_action(vk: u32) -> u8 {
+        for (action, hk) in bindings() {
+            if hk.vk != 0 {
+                continue;
+            }
+            let hit = match hk.mods {
+                CTRL => is_ctrl(vk),
+                ALT => is_alt(vk),
+                SHIFT => is_shift(vk),
+                _ => false,
+            };
+            if hit {
+                return action;
+            }
+        }
+        0
+    }
+
+    /// Stop a lone Alt release from opening the app's menu bar after we ate Alt+key.
+    fn send_mask_key() {
+        let mk = |up: bool| INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VIRTUAL_KEY(0xE8),
+                    wScan: 0,
+                    dwFlags: if up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) },
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+        unsafe {
+            SendInput(&[mk(false), mk(true)], std::mem::size_of::<INPUT>() as i32);
         }
     }
 
@@ -117,62 +178,99 @@ mod imp {
         });
     }
 
+    fn fire(action: u8) {
+        match action {
+            1 => send(HookEvent::Trigger),
+            2 => send(HookEvent::Capture),
+            _ => {}
+        }
+    }
+
     unsafe extern "system" fn kb_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         if code >= 0 {
             let k = &*(lparam.0 as *const KBDLLHOOKSTRUCT);
             let injected = (k.flags.0 & LLKHF_INJECTED.0) != 0;
-            if !injected {
+            if !injected && !PAUSED.load(Ordering::Relaxed) {
                 let msg = wparam.0 as u32;
-                let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
-                let up = msg == WM_KEYUP || msg == WM_SYSKEYUP;
+                let is_down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
+                let is_up = msg == WM_KEYUP || msg == WM_SYSKEYUP;
                 let vk = k.vkCode;
-                if down
+                if is_down
                     && vk == VK_ESCAPE.0 as u32
                     && (POPUP_VISIBLE.load(Ordering::Relaxed) || CAPTURE_VISIBLE.load(Ordering::Relaxed))
                 {
                     send(HookEvent::Escape);
                 }
-                let time = k.time;
-                let class = class_of(vk);
-                let mut fire = 0u8;
+
+                // Key combos (modifiers + key): fire on key-down and eat the key.
+                let mut swallow = false;
                 TAP.with(|t| {
                     let mut t = t.borrow_mut();
-                    if down {
-                        if class != 0 && t.held == 0 {
-                            t.held = class;
+                    if t.swallowed == vk {
+                        swallow = true;
+                        if is_up {
+                            t.swallowed = 0;
+                        }
+                    }
+                });
+                if swallow {
+                    return LRESULT(1);
+                }
+                if is_down && !is_modifier(vk) {
+                    let (m, win) = mods_now();
+                    for (action, hk) in bindings() {
+                        if hk.vk != 0 && hk.vk as u32 == vk && hk.mods == m && !win {
+                            TAP.with(|t| {
+                                let mut t = t.borrow_mut();
+                                t.swallowed = vk;
+                                t.clean = false;
+                                t.last_tap = None;
+                            });
+                            if m & ALT != 0 {
+                                send_mask_key();
+                            }
+                            fire(action);
+                            return LRESULT(1);
+                        }
+                    }
+                }
+
+                // Double taps of a single modifier.
+                let time = k.time;
+                let action = tap_action(vk);
+                let mut fired = 0u8;
+                TAP.with(|t| {
+                    let mut t = t.borrow_mut();
+                    if is_down {
+                        if action != 0 && t.held == 0 {
+                            t.held = action;
                             t.down_at = time;
                             t.clean = true;
-                        } else if class == 0 || class != t.held {
+                        } else if action == 0 || action != t.held {
                             // Any other key (or a second modifier) spoils the tap.
                             t.clean = false;
                             t.last_tap = None;
                         }
-                    } else if up && class != 0 && class == t.held {
+                    } else if is_up && action != 0 && action == t.held {
                         t.held = 0;
                         if t.clean && time.wrapping_sub(t.down_at) < TAP_MAX_MS {
                             match t.last_tap {
-                                Some((c, prev)) if c == class && time.wrapping_sub(prev) <= GAP_MAX_MS => {
+                                Some((a, prev)) if a == action && time.wrapping_sub(prev) <= GAP_MAX_MS => {
                                     t.last_tap = None;
-                                    fire = class;
+                                    fired = action;
                                 }
-                                _ => t.last_tap = Some((class, time)),
+                                _ => t.last_tap = Some((action, time)),
                             }
                         } else {
                             t.last_tap = None;
                         }
-                    } else if up && t.held != 0 && class == 0 && !is_ctrl(vk) && !is_alt(vk) && !is_shift(vk) {
-                        // ignore releases of ordinary keys
-                    } else if up && t.held != 0 && class != t.held {
+                    } else if is_up && t.held != 0 && is_modifier(vk) && action != t.held {
                         t.held = 0;
                         t.clean = false;
                         t.last_tap = None;
                     }
                 });
-                match fire {
-                    1 => send(HookEvent::Trigger),
-                    2 => send(HookEvent::Capture),
-                    _ => {}
-                }
+                fire(fired);
             }
         }
         CallNextHookEx(None, code, wparam, lparam)
@@ -297,6 +395,15 @@ mod imp {
         } else {
             Saved::Empty
         };
+        // After a combo like Alt+Q the user may still hold Alt/Shift; Ctrl+C must go out alone.
+        let wait = Instant::now();
+        while wait.elapsed() < Duration::from_millis(1500) {
+            let (m, win) = mods_now();
+            if m == 0 && !win {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(15));
+        }
         let seq0 = unsafe { GetClipboardSequenceNumber() };
         send_ctrl_c();
         let start = Instant::now();

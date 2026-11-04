@@ -82,3 +82,20 @@ kbd{font:600 11px "Segoe UI";background:var(--panel);border:1px solid var(--line
 .toast.on{opacity:1;transform:translate(-50%,0)}
 .hint.top{margin:0 0 8px;line-height:1.45}
 .hint.top b{color:var(--text);font-weight:600}
+.keyrow{display:grid;grid-template-columns:1fr auto 112px;gap:8px;align-items:center;transition:opacity var(--t-med)}
+.keyrow.off{opacity:.45;pointer-events:none}
+.keyrow .plus{color:var(--muted);font-weight:700}
+.kbox{position:relative;height:36px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:#fff;font-weight:700;
+  display:flex;align-items:center;justify-content:center;padding:0 24px;font-variant-numeric:tabular-nums;cursor:pointer}
+.kbox:hover{border-color:#4A4F58}
+.kbox.empty .kv{color:var(--muted);font-weight:600}
+.kbox.rec{border-color:var(--red);box-shadow:0 0 0 3px rgba(229,56,59,.18);color:var(--muted);font-weight:600;font-size:12px;animation:recp 1.2s ease-in-out infinite}
+@keyframes recp{50%{box-shadow:0 0 0 5px rgba(229,56,59,.08)}}
+.kx{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:4px;display:grid;place-items:center;
+  color:var(--muted);font-weight:400;font-size:15px;line-height:1}
+.kx:hover{color:#fff;background:var(--hover)}
+.kbox.empty .kx,.kbox.rec .kx{display:none}
+.khint:empty{display:none}
+.hint.warn{color:var(--warn)}
+.kbox .kv{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kbox.rec{padding:0 6px}

@@ -20,14 +20,24 @@
 
   <div class="pane on" id="p-set">
     <div class="grp">
-      <label class="sw"><span>Dịch chữ bôi đen<small>Bôi đen rồi nhấn nhanh phím 2 lần</small></span><input type="checkbox" class="tg" id="enabled" aria-label="Bật dịch chữ bôi đen"></label>
-      <div class="seg" id="hotkey">
-        <button data-v="ctrl">Ctrl × 2</button><button data-v="alt">Alt × 2</button>
+      <label class="sw"><span>Dịch chữ bôi đen<small>Bôi đen chữ rồi nhấn phím tắt</small></span><input type="checkbox" class="tg" id="enabled" aria-label="Bật dịch chữ bôi đen"></label>
+      <div class="keyrow" data-which="text">
+        <select class="kmods" aria-label="Phím chức năng"><option value="1">Ctrl</option><option value="2">Alt</option><option value="4">Shift</option><option value="3">Ctrl + Alt</option><option value="5">Ctrl + Shift</option><option value="6">Alt + Shift</option><option value="7">Ctrl + Alt + Shift</option><option value="0">Không (chỉ phím F1–F24)</option></select>
+        <span class="plus">+</span>
+        <button type="button" class="kbox" title="Bấm vào rồi nhấn 1 phím. Để trống = nhấn nhanh 2 lần"><span class="kv"></span><span class="kx" title="Xoá (nhấn 2 lần)" aria-label="Xoá">×</span></button>
       </div>
+      <p class="hint khint"></p>
     </div>
 
     <div class="grp">
-      <label class="sw"><span>Dịch vùng màn hình<small>Nhấn <kbd class="fixed">Shift</kbd> <kbd class="fixed">Shift</kbd> rồi kéo chọn vùng có chữ</small></span><input type="checkbox" class="tg" id="capture" aria-label="Bật dịch vùng màn hình"></label>
+      <label class="sw"><span>Dịch vùng màn hình<small>Nhấn phím tắt rồi kéo chọn vùng có chữ</small></span><input type="checkbox" class="tg" id="capture" aria-label="Bật dịch vùng màn hình"></label>
+      <div class="keyrow" data-which="capture">
+        <select class="kmods" aria-label="Phím chức năng"><option value="1">Ctrl</option><option value="2">Alt</option><option value="4">Shift</option><option value="3">Ctrl + Alt</option><option value="5">Ctrl + Shift</option><option value="6">Alt + Shift</option><option value="7">Ctrl + Alt + Shift</option><option value="0">Không (chỉ phím F1–F24)</option></select>
+        <span class="plus">+</span>
+        <button type="button" class="kbox" title="Bấm vào rồi nhấn 1 phím. Để trống = nhấn nhanh 2 lần"><span class="kv"></span><span class="kx" title="Xoá (nhấn 2 lần)" aria-label="Xoá">×</span></button>
+      </div>
+      <p class="hint khint"></p>
+      <p class="hint">Ô bên phải để trống = nhấn nhanh phím bên trái 2 lần.</p>
     </div>
 
     <div class="grp">
@@ -71,14 +81,14 @@
     <h4>Cách dùng</h4>
     <ol>
       <li>Bôi đen 1 từ hoặc 1 câu tiếng Anh (trên Chrome, PDF, Word…)</li>
-      <li>Nhấn nhanh <kbd>Ctrl</kbd> <kbd>Ctrl</kbd> → bản dịch hiện ngay cạnh chuột</li>
+      <li>Nhấn <kbd class="k-text">Ctrl × 2</kbd> → bản dịch hiện ngay cạnh chuột</li>
       <li>Với 1 từ, bấm <b>More</b> để xem thêm nghĩa và câu ví dụ</li>
       <li>Muốn bản dịch tự nhiên hơn, có phiên âm? Bấm <b>Dịch với Claude</b> (cần API key)</li>
       <li>Bấm ra ngoài hoặc nhấn <kbd class="fixed">Esc</kbd> để đóng</li>
     </ol>
     <h4>Dịch chữ trong ảnh, game, video</h4>
     <ol>
-      <li>Nhấn nhanh <kbd class="fixed">Shift</kbd> <kbd class="fixed">Shift</kbd> (hoặc chuột phải icon khay → Chọn vùng màn hình)</li>
+      <li>Nhấn <kbd class="k-capture">Shift × 2</kbd> (hoặc chuột phải icon khay → Chọn vùng màn hình)</li>
       <li>Kéo chuột khoanh vùng có chữ, thả ra là dịch</li>
       <li>Chữ khó đọc? Bấm <b>Dịch với Claude</b> trong popup</li>
     </ol>
@@ -89,7 +99,7 @@
       <li>Dán vào tab Cài đặt → bấm <b>Lưu</b></li>
     </ol>
     <p>Không nhập key thì MTrans vẫn dịch bằng Google. Có key thì popup có thêm nút <b>Dịch với Claude</b>.</p>
-    <p>Chuột trái vào icon MTrans ở khay hệ thống để tạm tắt/bật lại. Chuột phải để mở menu.</p>
+    <p>Đổi phím tắt ở tab Cài đặt. Chuột trái vào icon MTrans ở khay hệ thống để tạm tắt/bật lại. Chuột phải để mở menu.</p>
     <div class="credit">Created by Mondiro</div>
   </div>
 </div>

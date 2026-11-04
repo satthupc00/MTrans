@@ -1,6 +1,7 @@
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use crate::hotkey::{self, Hotkey};
 use tauri::{AppHandle, Manager};
 
 pub const MODELS: [&str; 3] = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
@@ -9,8 +10,13 @@ pub const MODELS: [&str; 3] = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-
 #[serde(default)]
 pub struct Settings {
     pub enabled: bool,
-    /// Key for translating the selection: "ctrl" | "alt" (Shift is for screen capture).
+    /// Legacy (≤ 1.1.1): "ctrl" | "alt" double tap. Read once to fill `text_key`.
     pub hotkey: String,
+    /// Shortcut for translating the selection.
+    pub text_key: Hotkey,
+    /// Shortcut for picking a screen region.
+    pub capture_key: Hotkey,
+    pub keys_v2: bool,
     /// Shift × 2 picks a screen region to translate.
     pub capture_enabled: bool,
     pub model: String,
@@ -24,6 +30,9 @@ impl Default for Settings {
         Settings {
             enabled: true,
             hotkey: "ctrl".into(),
+            text_key: Hotkey::double(hotkey::CTRL),
+            capture_key: Hotkey::double(hotkey::SHIFT),
+            keys_v2: false,
             capture_enabled: true,
             model: MODELS[0].into(),
             api_key_enc: String::new(),
@@ -47,8 +56,16 @@ impl Settings {
         if !MODELS.contains(&s.model.as_str()) {
             s.model = MODELS[0].into();
         }
-        if !["ctrl", "alt"].contains(&s.hotkey.as_str()) {
-            s.hotkey = "ctrl".into();
+        if !s.keys_v2 {
+            s.text_key = Hotkey::double(if s.hotkey == "alt" { hotkey::ALT } else { hotkey::CTRL });
+            s.capture_key = Hotkey::double(hotkey::SHIFT);
+            s.keys_v2 = true;
+        }
+        if s.text_key.check().is_err() {
+            s.text_key = Hotkey::double(hotkey::CTRL);
+        }
+        if s.capture_key.check().is_err() || s.capture_key == s.text_key {
+            s.capture_key = Hotkey::double(hotkey::SHIFT);
         }
         s
     }
@@ -79,12 +96,5 @@ impl Settings {
         self.api_key_enc = crate::win::protect(key.as_bytes())
             .map(|v| B64.encode(v))
             .unwrap_or_default();
-    }
-
-    pub fn hotkey_label(&self) -> &'static str {
-        match self.hotkey.as_str() {
-            "alt" => "Alt",
-            _ => "Ctrl",
-        }
     }
 }
