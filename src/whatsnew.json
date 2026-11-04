@@ -1,15 +1,13 @@
 {
-  "version": "1.1.0",
+  "version": "1.1.1",
   "date": "2026-11-04",
   "new": [
-    "Dịch bằng Google: nhanh gần như tức thì, miễn phí, không cần API key",
-    "Chọn nguồn dịch trong Cài đặt: Kết hợp (Google + Claude khi bấm More), chỉ Google, hoặc chỉ Claude",
-    "Dịch chữ trên màn hình: nhấn nhanh Shift 2 lần, kéo chọn vùng có chữ (ảnh, game, video) là dịch ngay",
-    "Nút \"Thử với Claude\" khi chữ trong ảnh khó đọc"
+    "Nút \"Dịch với Claude\" ngay trong popup: cạnh chữ More, ở góc dưới khi mở rộng, và dưới bản dịch câu/ảnh"
   ],
   "improved": [
-    "Claude trả lời nhanh hơn nhờ giữ sẵn kết nối",
-    "Tự chuyển sang Claude khi Google Dịch bị lỗi"
+    "Mặc định luôn dịch bằng Google cho nhanh; chỉ dùng Claude khi bạn bấm nút",
+    "Cài đặt gọn hơn: bỏ mục chọn nguồn dịch, chỉ cần nhập API key nếu muốn dùng Claude",
+    "Khi đổi sang Claude, bản dịch Google vẫn hiện mờ trong lúc chờ"
   ],
   "fixed": []
 }

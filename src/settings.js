@@ -37,24 +37,16 @@ async function load() {
   $('hotkey').classList.toggle('off', !S.enabled);
   $('hotkey').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.hotkey));
   $('model').value = S.model;
-  $('source').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.source));
-  $('sourceHint').textContent = {
-    mix: 'Google cho bản dịch nhanh, Claude khi bấm More. Khuyên dùng.',
-    google: 'Chỉ dùng Google: nhanh, miễn phí, không cần API key, không có phiên âm.',
-    claude: 'Chỉ dùng Claude: dịch tự nhiên nhất, có phiên âm, chậm hơn và tốn credits.',
-  }[S.source];
-  document.querySelectorAll('.claudeOnly').forEach((g) => g.classList.toggle('dim', S.source === 'google'));
   $('capture').checked = S.capture_enabled;
   $('autostart').checked = S.autostart;
   $('ver').textContent = 'v' + S.version;
   $('key').placeholder = S.has_key ? `Đã lưu (${S.key_hint}) · dán key mới để thay` : 'Dán API key vào đây';
-  if (!$('key').value) setHint(S.has_key ? '✓ Đã có API key' : 'Chưa có API key. Xem tab Trợ giúp để lấy key.', S.has_key ? 'ok' : '');
+  if (!$('key').value) setHint(S.has_key ? '✓ Đã có API key, nút Dịch với Claude đã sẵn sàng' : 'Chưa có key: đang dịch bằng Google. Cách lấy key ở tab Trợ giúp.', S.has_key ? 'ok' : '');
   document.querySelectorAll('kbd:not(.fixed)').forEach((k) => (k.textContent = S.hotkey === 'alt' ? 'Alt' : 'Ctrl'));
 }
 
 $('enabled').onchange = (e) => invoke('set_enabled', { on: e.target.checked }).then(load);
 $('hotkey').querySelectorAll('button').forEach((b) => (b.onclick = () => invoke('set_hotkey', { hotkey: b.dataset.v }).then(load)));
-$('source').querySelectorAll('button').forEach((b) => (b.onclick = () => invoke('set_source', { source: b.dataset.v }).then(load)));
 $('capture').onchange = (e) => invoke('set_capture_enabled', { on: e.target.checked }).then(load);
 $('model').onchange = (e) => invoke('set_model', { model: e.target.value }).then(() => toast('Đã đổi model'));
 $('autostart').onchange = (e) =>

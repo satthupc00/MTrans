@@ -1,6 +1,6 @@
 [package]
 name = "mtrans"
-version = "1.1.0"
+version = "1.1.1"
 description = "MTrans - dịch nhanh tiếng Anh sang tiếng Việt"
 authors = ["Mondiro"]
 edition = "2021"

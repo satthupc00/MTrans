@@ -32,7 +32,7 @@ function el(tag, cls, text) {
 const dots = () => { const d = el('span', 'load'); d.append(el('i'), el('i'), el('i')); return d; };
 
 /** Run one translation; onText gets the whole text so far. */
-function run(kind, text, seq, onText) {
+function run(kind, text, seq, onText, engine = 'google') {
   const ch = new Channel();
   let acc = '';
   ch.onmessage = (chunk) => {
@@ -40,7 +40,7 @@ function run(kind, text, seq, onText) {
     acc += chunk;
     onText(acc, false);
   };
-  return invoke('translate', { text, kind, onEvent: ch }).then((full) => {
+  return invoke('translate', { text, kind, engine, onEvent: ch }).then((full) => {
     if (seq === cur) onText(full, true);
   });
 }
@@ -51,7 +51,7 @@ function showError(e) {
   const row = el('div', 'err');
   row.append(el('span', 'dot'));
   if (e === 'nokey') {
-    row.append(el('span', null, 'Chưa có API key'));
+    row.append(el('span', null, 'Nhập API key để dịch với Claude'));
     const b = el('button', 'lnk', 'Mở Cài đặt');
     b.onclick = () => invoke('open_settings', { tab: 'set' });
     row.append(b);
@@ -60,6 +60,25 @@ function showError(e) {
   }
   pop.append(row);
   fit(true);
+}
+
+/** Small "Dịch với Claude" link; inside an error line when no key is set. */
+function claudeLink(label, onClick) {
+  const b = el('button', 'lnk cl', label);
+  b.title = 'Dịch lại bằng Claude: tự nhiên hơn, có phiên âm';
+  b.onclick = onClick;
+  return b;
+}
+
+function claudeMark() {
+  return el('span', 'by', 'Bản dịch của Claude');
+}
+
+/** Footer row (bottom right) under the popup content. */
+function footer(...kids) {
+  const f = el('div', 'pfoot');
+  f.append(...kids);
+  return f;
 }
 
 // ---------- single word ----------
@@ -116,6 +135,7 @@ function renderDetail(box, text, word) {
 }
 
 function startWord(text, seq) {
+  let engine = 'google';
   pop.className = 'pop';
   pop.replaceChildren();
   const line = el('div', 'line');
@@ -126,32 +146,78 @@ function startWord(text, seq) {
   more.title = 'Xem thêm nghĩa và ví dụ';
   more.innerHTML = 'More<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>';
   more.hidden = true;
-  line.append(el('span', 'w', text), ipa, m, more);
+  const toClaude = () => switchToClaude();
+  const lineCl = claudeLink('Claude', toClaude);
+  lineCl.classList.add('inline');
+  lineCl.hidden = true;
+  line.append(el('span', 'w', text), ipa, m, more, lineCl);
   const detail = el('div', 'detail');
   const wrap = el('div');
   const inner = el('div', 'in');
+  const body = el('div');
+  const foot = footer(claudeLink('Dịch với Claude', toClaude));
+  inner.append(body, foot);
   wrap.append(inner);
   detail.append(wrap);
   pop.append(line, detail);
   fit(true);
 
-  run('short', text, seq, (t, done) => {
-    const r = parseShort(t);
-    ipa.textContent = r.ipa;
-    m.textContent = r.meaning;
-    if (done) more.hidden = false;
-  }).catch((e) => seq === cur && showError(e));
-
   let loaded = false;
+  const loadShort = () => {
+    // Switching to Claude: keep the Google meaning (dimmed) until Claude answers.
+    if (engine === 'claude' && m.textContent) line.classList.add('stale');
+    else m.replaceChildren(dots());
+    return run('short', text, seq, (t, done) => {
+      line.classList.remove('stale');
+      const r = parseShort(t);
+      ipa.textContent = r.ipa;
+      m.textContent = r.meaning;
+      if (done) {
+        more.hidden = false;
+        lineCl.hidden = engine === 'claude';
+      }
+    }, engine).catch((e) => {
+      if (seq !== cur) return;
+      line.classList.remove('stale');
+      if (e === 'nokey') showNoKey(); else showError(e);
+    });
+  };
+  const loadDetail = () => {
+    loaded = true;
+    if (engine === 'claude' && body.textContent) body.classList.add('stale');
+    else body.replaceChildren(dots());
+    run('detail', text, seq, (t) => { body.classList.remove('stale'); renderDetail(body, t, text); }, engine).catch((e) => {
+      loaded = false;
+      body.classList.remove('stale');
+      if (seq !== cur) return;
+      if (e === 'nokey') showNoKey(); else body.replaceChildren(el('span', null, String(e)));
+    });
+  };
+  function showNoKey() {
+    // Keep the Google result, just say why Claude did not run.
+    engine = 'google';
+    lineCl.hidden = true;
+    pop.classList.add('open');
+    if (!loaded && !body.textContent) loadDetail();
+    loaded = true;
+    const b = el('button', 'lnk', 'Mở Cài đặt');
+    b.onclick = () => invoke('open_settings', { tab: 'set' });
+    foot.replaceChildren(el('span', 'by warn', 'Cần API key để dịch với Claude'), b);
+  }
+  function switchToClaude() {
+    if (engine === 'claude') return;
+    engine = 'claude';
+    lineCl.hidden = true;
+    foot.replaceChildren(claudeMark());
+    loadShort();
+    if (pop.classList.contains('open')) loadDetail();
+    else loaded = false;
+  }
+
+  loadShort();
   more.onclick = () => {
     pop.classList.toggle('open');
-    if (loaded) return;
-    loaded = true;
-    inner.replaceChildren(dots());
-    run('detail', text, seq, (t) => renderDetail(inner, t, text)).catch((e) => {
-      loaded = false;
-      inner.replaceChildren(el('span', null, e === 'nokey' ? 'Chưa có API key' : String(e)));
-    });
+    if (!loaded) loadDetail();
   };
 }
 
@@ -162,12 +228,29 @@ function startSentence(text, seq) {
   pop.replaceChildren();
   const box = el('div', 'sent');
   box.append(dots());
-  pop.append(box);
+  const foot = footer();
+  pop.append(box, foot);
   fit(true);
-  run('sentence', text, seq, (t, done) => {
-    box.textContent = t;
-    if (!done) box.append(el('span', 'caret'));
-  }).catch((e) => seq === cur && showError(e));
+  const go = (engine) => {
+    foot.replaceChildren();
+    if (engine === 'claude' && box.textContent) box.classList.add('stale');
+    else box.replaceChildren(dots());
+    run('sentence', text, seq, (t, done) => {
+      box.classList.remove('stale');
+      box.textContent = t;
+      if (!done) box.append(el('span', 'caret'));
+      else foot.replaceChildren(engine === 'claude' ? claudeMark() : claudeLink('Dịch với Claude', () => go('claude')));
+    }, engine).catch((e) => {
+      if (seq !== cur) return;
+      box.classList.remove('stale');
+      if (e === 'nokey') {
+        const b = el('button', 'lnk', 'Mở Cài đặt');
+        b.onclick = () => invoke('open_settings', { tab: 'set' });
+        foot.replaceChildren(el('span', 'by warn', 'Cần API key để dịch với Claude'), b);
+      } else showError(e);
+    });
+  };
+  go('google');
 }
 
 // ---------- screen region (image) ----------
@@ -188,16 +271,14 @@ function startImage(seq, engine) {
   ocr.append(ocrText);
   const box = el('div', 'sent');
   const foot = el('div', 'pfoot');
-  const retry = el('button', 'lnk', 'Thử với Claude');
+  const retry = claudeLink('Dịch với Claude', () => { cur += 0.001; startImage(cur, 'claude'); });
   retry.title = 'Gửi ảnh cho Claude đọc và dịch lại';
-  retry.onclick = () => { cur += 0.001; startImage(cur, 'claude'); };
-  foot.append(retry);
+  foot.append(engine === 'claude' ? claudeMark() : retry);
   let shown = false;
   const show = () => {
     if (shown) return;
     shown = true;
-    pop.replaceChildren(ocr, box);
-    if (engine !== 'claude') pop.append(foot);
+    pop.replaceChildren(ocr, box, foot);
   };
 
   const ch = new Channel();
@@ -239,6 +320,8 @@ function startImage(seq, engine) {
         showError('Không thấy chữ trong vùng này');
         // Still offer Claude, it reads stylised text better.
         if (engine !== 'claude') pop.append(foot);
+      } else if (e === 'nokey' && engine === 'claude') {
+        showError('nokey');
       } else showError(e);
     });
 }

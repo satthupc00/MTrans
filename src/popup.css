@@ -37,6 +37,14 @@ body{user-select:text}
 .ocr{padding:9px 12px 0;color:var(--muted);font-size:11.5px;display:flex;gap:6px;align-items:flex-start;animation:fade .22s var(--ease-out)}
 .ocr svg{width:12px;height:12px;flex:0 0 auto;margin-top:2px}
 .ocr span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.pfoot{display:flex;justify-content:flex-end;padding:0 8px 6px}
-.pfoot .lnk{font-size:11.5px}
+.pfoot{display:flex;justify-content:flex-end;align-items:center;gap:6px;padding:0 8px 6px;min-height:22px}
+.pfoot:empty{display:none}
+.in .pfoot{padding:8px 0 0}
+.lnk.cl{font-size:11.5px;color:#E86A6C}
+.lnk.cl:hover{color:var(--red)}
+.lnk.cl.inline{font-size:11px;padding:2px 3px;align-self:center;white-space:nowrap}
+.pop.open .lnk.cl.inline{display:none}
+.by{color:#6B707A;font-size:11px}
+.by.warn{color:var(--warn)}
 .sent.wait{color:var(--muted);display:flex;align-items:center;gap:6px}
+.stale{opacity:.45;transition:opacity var(--t-med)}

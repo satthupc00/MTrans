@@ -273,16 +273,16 @@ fn shot_png_b64(shot: &Shot) -> Option<String> {
 #[tauri::command]
 async fn translate_image(app: AppHandle, engine: String, on_event: Channel<ImgMsg>) -> Result<(), String> {
     let state = app.state::<AppState>();
-    let (key, model, source) = {
+    let (key, model) = {
         let s = state.settings.lock().unwrap();
-        (s.api_key(), s.model.clone(), s.source.clone())
+        (s.api_key(), s.model.clone())
     };
     let (bgra, w, h) = {
         let g = state.shot.lock().unwrap();
         let s = g.as_ref().ok_or("Không có ảnh")?;
         (s.bgra.clone(), s.w, s.h)
     };
-    let mut use_claude = engine == "claude" || source == "claude";
+    let mut use_claude = engine == "claude";
 
     if !use_claude {
         let ocr = tauri::async_runtime::spawn_blocking(move || win::ocr(&bgra, w, h))
@@ -345,11 +345,8 @@ fn click_is_outside_popup(app: &AppHandle, x: i32, y: i32) -> bool {
 /// Open the connection to Claude while the selection is being read, when Claude
 /// may be used (saves the TLS handshake on the real request).
 fn warm_up_claude(app: &AppHandle) {
-    let (key, source) = {
-        let s = app.state::<AppState>().settings.lock().unwrap().clone();
-        (s.api_key(), s.source)
-    };
-    if let (Some(key), false) = (key, source == "google") {
+    let key = app.state::<AppState>().settings.lock().unwrap().api_key();
+    if let Some(key) = key {
         tauri::async_runtime::spawn(async move { claude::warm_up(&key).await });
     }
 }
@@ -459,7 +456,6 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 struct SettingsView {
     enabled: bool,
     hotkey: String,
-    source: String,
     capture_enabled: bool,
     model: String,
     has_key: bool,
@@ -482,7 +478,6 @@ fn get_settings(app: AppHandle, state: State<AppState>) -> SettingsView {
     SettingsView {
         enabled: s.enabled,
         hotkey: s.hotkey.clone(),
-        source: s.source.clone(),
         capture_enabled: s.capture_enabled,
         model: s.model.clone(),
         has_key: key.is_some(),
@@ -506,15 +501,6 @@ fn set_hotkey(app: AppHandle, state: State<AppState>, hotkey: String) {
         s.save(&app);
     }
     refresh_tray(&app);
-}
-
-#[tauri::command]
-fn set_source(app: AppHandle, state: State<AppState>, source: String) {
-    if ["mix", "google", "claude"].contains(&source.as_str()) {
-        let mut s = state.settings.lock().unwrap();
-        s.source = source;
-        s.save(&app);
-    }
 }
 
 #[tauri::command]
@@ -566,16 +552,6 @@ async fn test_saved_key(app: AppHandle) -> Result<(), String> {
     }
 }
 
-/// Which engine serves a request: Google for quick text in "mix"/"google" modes,
-/// Claude for the More details in "mix" mode and for everything in "claude" mode.
-fn wants_google(source: &str, kind: &claude::Kind, has_key: bool) -> bool {
-    match source {
-        "google" => true,
-        "claude" => !has_key,
-        _ => !matches!(kind, claude::Kind::Detail) || !has_key,
-    }
-}
-
 async fn google_for(kind: &claude::Kind, text: &str) -> Result<String, String> {
     match kind {
         claude::Kind::Short => google::short(text).await,
@@ -585,17 +561,24 @@ async fn google_for(kind: &claude::Kind, text: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn translate(app: AppHandle, text: String, kind: String, on_event: Channel<String>) -> Result<String, String> {
+async fn translate(
+    app: AppHandle,
+    text: String,
+    kind: String,
+    engine: Option<String>,
+    on_event: Channel<String>,
+) -> Result<String, String> {
     let k = claude::Kind::parse(&kind).ok_or("kind")?;
     let state = app.state::<AppState>();
-    let (key, model, source) = {
+    let (key, model) = {
         let s = state.settings.lock().unwrap();
-        (s.api_key(), s.model.clone(), s.source.clone())
+        (s.api_key(), s.model.clone())
     };
-    if source == "claude" && key.is_none() {
+    // Google by default; Claude only when the popup asks for it ("Dịch với Claude").
+    let google_first = engine.as_deref() != Some("claude");
+    if !google_first && key.is_none() {
         return Err("nokey".into());
     }
-    let google_first = wants_google(&source, &k, key.is_some());
     let engine = if google_first { "google".to_string() } else { model.clone() };
     let cache_key = match k {
         claude::Kind::Sentence => None,
@@ -791,7 +774,6 @@ pub fn run() {
             translate_image,
             capture_region,
             capture_cancel,
-            set_source,
             set_capture_enabled,
             popup_resize,
             popup_hide,
