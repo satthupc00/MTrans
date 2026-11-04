@@ -170,9 +170,83 @@ function startSentence(text, seq) {
   }).catch((e) => seq === cur && showError(e));
 }
 
+// ---------- screen region (image) ----------
+
+const IMG_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>';
+
+function startImage(seq, engine) {
+  pop.className = 'pop';
+  pop.replaceChildren();
+  const wait = el('div', 'sent wait');
+  wait.append(dots(), el('span', null, engine === 'claude' ? 'Claude đang đọc ảnh…' : 'Đang đọc chữ trong ảnh…'));
+  pop.append(wait);
+  fit(true);
+
+  const ocr = el('div', 'ocr');
+  ocr.innerHTML = IMG_ICON;
+  const ocrText = el('span');
+  ocr.append(ocrText);
+  const box = el('div', 'sent');
+  const foot = el('div', 'pfoot');
+  const retry = el('button', 'lnk', 'Thử với Claude');
+  retry.title = 'Gửi ảnh cho Claude đọc và dịch lại';
+  retry.onclick = () => { cur += 0.001; startImage(cur, 'claude'); };
+  foot.append(retry);
+  let shown = false;
+  const show = () => {
+    if (shown) return;
+    shown = true;
+    pop.replaceChildren(ocr, box);
+    if (engine !== 'claude') pop.append(foot);
+  };
+
+  const ch = new Channel();
+  let acc = '';
+  ch.onmessage = (m) => {
+    if (seq !== cur) return;
+    if (m.t === 'ocr') {
+      show();
+      ocrText.textContent = m.text;
+      box.replaceChildren(dots());
+      return;
+    }
+    acc += m.text;
+    show();
+    if (engine === 'claude') {
+      // Claude answers "original\n---\ntranslation".
+      const i = acc.indexOf('\n---');
+      if (i < 0) {
+        ocrText.textContent = acc.trim();
+        box.replaceChildren(dots());
+      } else {
+        ocrText.textContent = acc.slice(0, i).trim();
+        box.textContent = acc.slice(i).replace(/^\n-+\s*/, '');
+        box.append(el('span', 'caret'));
+      }
+    } else {
+      box.textContent = acc;
+    }
+  };
+  invoke('translate_image', { engine, onEvent: ch })
+    .then(() => {
+      if (seq !== cur) return;
+      box.querySelector('.caret')?.remove();
+      if (/^\(không có chữ\)/i.test(acc.trim())) showError('Không thấy chữ trong vùng này');
+    })
+    .catch((e) => {
+      if (seq !== cur) return;
+      if (e === 'notext') {
+        showError('Không thấy chữ trong vùng này');
+        // Still offer Claude, it reads stylised text better.
+        if (engine !== 'claude') pop.append(foot);
+      } else showError(e);
+    });
+}
+
 listen('mtrans://show', ({ payload }) => {
   cur = payload.seq;
   if (payload.mode === 'word') startWord(payload.text, payload.seq);
+  else if (payload.mode === 'image') startImage(payload.seq, 'auto');
   else startSentence(payload.text, payload.seq);
 });
 

@@ -92,12 +92,18 @@ pub fn friendly_error(status: u16, body: &str) -> String {
     }
 }
 
-pub fn client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .unwrap_or_default()
+fn client() -> &'static reqwest::Client {
+    crate::http()
+}
+
+/// Open the TLS connection ahead of time so the real request starts faster.
+pub async fn warm_up(key: &str) {
+    let _ = client()
+        .get("https://api.anthropic.com/v1/models?limit=1")
+        .header("x-api-key", key)
+        .header("anthropic-version", API_VERSION)
+        .send()
+        .await;
 }
 
 /// Stream a translation. `on_text` receives each text chunk; the full text is returned.
@@ -106,16 +112,46 @@ pub async fn stream(
     model: &str,
     kind: &Kind,
     text: &str,
-    mut on_text: impl FnMut(&str),
+    on_text: impl FnMut(&str),
 ) -> Result<String, String> {
     let (system, max_tokens) = prompt(kind);
+    let content = json!(format!("<text>{text}</text>"));
+    run(key, model, &system, max_tokens, content, on_text).await
+}
+
+/// Read and translate the text in a PNG screenshot. Output: original text, a line
+/// with only "---", then the Vietnamese translation.
+pub async fn image(key: &str, model: &str, png_b64: &str, on_text: impl FnMut(&str)) -> Result<String, String> {
+    let system = format!(
+        "Bạn đọc chữ trong ảnh chụp màn hình rồi dịch sang tiếng Việt. {CONTEXT}\n\
+         Trả lời đúng định dạng sau, không thêm gì khác:\n\
+         <toàn bộ chữ đọc được trong ảnh, giữ nguyên ngôn ngữ gốc, gộp thành đoạn liền mạch>\n\
+         ---\n\
+         <bản dịch tiếng Việt tự nhiên>\n\
+         Nếu ảnh không có chữ, chỉ trả lời: (không có chữ)"
+    );
+    let content = json!([
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": png_b64}},
+        {"type": "text", "text": "Đọc và dịch chữ trong ảnh này."}
+    ]);
+    run(key, model, &system, 4000, content, on_text).await
+}
+
+async fn run(
+    key: &str,
+    model: &str,
+    system: &str,
+    max_tokens: u32,
+    content: Value,
+    mut on_text: impl FnMut(&str),
+) -> Result<String, String> {
     let mut body = json!({
         "model": model,
         "max_tokens": max_tokens,
         "stream": true,
         "system": system,
         "output_config": {"effort": "low"},
-        "messages": [{"role": "user", "content": format!("<text>{text}</text>")}]
+        "messages": [{"role": "user", "content": content}]
     });
     if let Some(t) = thinking_for(model) {
         body["thinking"] = t;

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>MTrans</title>
+<link rel="stylesheet" href="common.css">
+<style>
+html,body{background:transparent;width:100%;height:100%;cursor:crosshair}
+#dim{position:fixed;inset:0;background:rgba(10,10,14,.45)}
+#dim.has{background:transparent}
+#sel{position:fixed;display:none;border:1.5px solid var(--red);border-radius:2px;
+  background:rgba(255,255,255,.01);box-shadow:0 0 0 9999px rgba(10,10,14,.55)}
+#sel i{position:absolute;width:7px;height:7px;background:#fff;border:1.5px solid var(--red);border-radius:2px}
+#sel i:nth-child(1){left:-4px;top:-4px}#sel i:nth-child(2){right:-4px;top:-4px}
+#sel i:nth-child(3){left:-4px;bottom:-4px}#sel i:nth-child(4){right:-4px;bottom:-4px}
+#size{position:fixed;display:none;font:600 11px "Segoe UI";color:#fff;background:var(--red);padding:2px 7px;border-radius:4px;font-variant-numeric:tabular-nums;white-space:nowrap}
+#hint{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:rgba(31,33,38,.92);border:1px solid var(--line);
+  border-radius:20px;padding:6px 14px;color:var(--text);font-size:12px;white-space:nowrap;display:flex;gap:8px;align-items:center;
+  animation:drop .25s var(--ease-out)}
+@keyframes drop{from{opacity:0;transform:translate(-50%,-6px)}}
+#hint kbd{font:600 10.5px "Segoe UI";background:var(--panel);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px}
+#hint .sep{color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="dim"></div>
+<div id="sel"><i></i><i></i><i></i><i></i></div>
+<div id="size"></div>
+<div id="hint">Kéo để chọn vùng cần dịch <span class="sep">·</span> <kbd>Esc</kbd> huỷ</div>
+<script src="capture.js"></script>
+</body>
+</html>

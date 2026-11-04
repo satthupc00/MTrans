@@ -1,9 +1,15 @@
 {
-  "version": "1.0.1",
-  "date": "2026-11-03",
-  "new": [],
-  "improved": [],
-  "fixed": [
-    "Nhấn Esc hoặc bấm ra ngoài giờ đã đóng được popup dịch"
-  ]
+  "version": "1.1.0",
+  "date": "2026-11-04",
+  "new": [
+    "Dịch bằng Google: nhanh gần như tức thì, miễn phí, không cần API key",
+    "Chọn nguồn dịch trong Cài đặt: Kết hợp (Google + Claude khi bấm More), chỉ Google, hoặc chỉ Claude",
+    "Dịch chữ trên màn hình: nhấn nhanh Shift 2 lần, kéo chọn vùng có chữ (ảnh, game, video) là dịch ngay",
+    "Nút \"Thử với Claude\" khi chữ trong ảnh khó đọc"
+  ],
+  "improved": [
+    "Claude trả lời nhanh hơn nhờ giữ sẵn kết nối",
+    "Tự chuyển sang Claude khi Google Dịch bị lỗi"
+  ],
+  "fixed": []
 }

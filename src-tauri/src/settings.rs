@@ -9,8 +9,12 @@ pub const MODELS: [&str; 3] = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-
 #[serde(default)]
 pub struct Settings {
     pub enabled: bool,
-    /// "ctrl" | "alt" | "shift"
+    /// Key for translating the selection: "ctrl" | "alt" (Shift is for screen capture).
     pub hotkey: String,
+    /// "mix" (Google fast + Claude for More) | "google" | "claude"
+    pub source: String,
+    /// Shift × 2 picks a screen region to translate.
+    pub capture_enabled: bool,
     pub model: String,
     /// API key, encrypted with Windows DPAPI (current user), base64.
     pub api_key_enc: String,
@@ -22,6 +26,8 @@ impl Default for Settings {
         Settings {
             enabled: true,
             hotkey: "ctrl".into(),
+            source: "mix".into(),
+            capture_enabled: true,
             model: MODELS[0].into(),
             api_key_enc: String::new(),
             first_run_done: false,
@@ -44,8 +50,11 @@ impl Settings {
         if !MODELS.contains(&s.model.as_str()) {
             s.model = MODELS[0].into();
         }
-        if !["ctrl", "alt", "shift"].contains(&s.hotkey.as_str()) {
+        if !["ctrl", "alt"].contains(&s.hotkey.as_str()) {
             s.hotkey = "ctrl".into();
+        }
+        if !["mix", "google", "claude"].contains(&s.source.as_str()) {
+            s.source = "mix".into();
         }
         s
     }
@@ -81,7 +90,6 @@ impl Settings {
     pub fn hotkey_label(&self) -> &'static str {
         match self.hotkey.as_str() {
             "alt" => "Alt",
-            "shift" => "Shift",
             _ => "Ctrl",
         }
     }

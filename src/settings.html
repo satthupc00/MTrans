@@ -20,14 +20,25 @@
 
   <div class="pane on" id="p-set">
     <div class="grp">
-      <label class="sw"><span>Dịch bằng phím tắt<small>Tắt tạm thời khi bạn không cần dịch</small></span><input type="checkbox" class="tg" id="enabled" aria-label="Bật dịch bằng phím tắt"></label>
-      <div class="seg" id="hotkey">
-        <button data-v="ctrl">Ctrl × 2</button><button data-v="alt">Alt × 2</button><button data-v="shift">Shift × 2</button>
+      <span class="lbl">Nguồn dịch</span>
+      <div class="seg" id="source">
+        <button data-v="mix" title="Google cho bản dịch nhanh, Claude khi bấm More">Kết hợp</button><button data-v="google" title="Chỉ dùng Google, không cần API key">Google</button><button data-v="claude" title="Chỉ dùng Claude">Claude</button>
       </div>
-      <p class="hint">Bôi đen chữ rồi nhấn nhanh phím 2 lần.</p>
+      <p class="hint" id="sourceHint">&nbsp;</p>
     </div>
 
     <div class="grp">
+      <label class="sw"><span>Dịch chữ bôi đen<small>Bôi đen rồi nhấn nhanh phím 2 lần</small></span><input type="checkbox" class="tg" id="enabled" aria-label="Bật dịch chữ bôi đen"></label>
+      <div class="seg" id="hotkey">
+        <button data-v="ctrl">Ctrl × 2</button><button data-v="alt">Alt × 2</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <label class="sw"><span>Dịch vùng màn hình<small>Nhấn <kbd class="fixed">Shift</kbd> <kbd class="fixed">Shift</kbd> rồi kéo chọn vùng có chữ</small></span><input type="checkbox" class="tg" id="capture" aria-label="Bật dịch vùng màn hình"></label>
+    </div>
+
+    <div class="grp claudeOnly">
       <label class="lbl" for="key">Claude API key</label>
       <div class="field">
         <input type="password" id="key" placeholder="Dán API key vào đây" spellcheck="false" autocomplete="off">
@@ -37,8 +48,8 @@
       <p class="hint" id="keyHint">&nbsp;</p>
     </div>
 
-    <div class="grp">
-      <label class="lbl" for="model">Model dịch</label>
+    <div class="grp claudeOnly">
+      <label class="lbl" for="model">Model Claude</label>
       <select id="model">
         <option value="claude-haiku-5-5">Haiku 5.5 — nhanh nhất, rẻ nhất (khuyên dùng)</option>
         <option value="claude-sonnet-5-5">Sonnet 5.5 — dịch mượt hơn</option>
@@ -69,7 +80,13 @@
       <li>Bôi đen 1 từ hoặc 1 câu tiếng Anh (trên Chrome, PDF, Word…)</li>
       <li>Nhấn nhanh <kbd>Ctrl</kbd> <kbd>Ctrl</kbd> → bản dịch hiện ngay cạnh chuột</li>
       <li>Với 1 từ, bấm <b>More</b> để xem thêm nghĩa và câu ví dụ</li>
-      <li>Bấm ra ngoài hoặc nhấn <kbd>Esc</kbd> để đóng</li>
+      <li>Bấm ra ngoài hoặc nhấn <kbd class="fixed">Esc</kbd> để đóng</li>
+    </ol>
+    <h4>Dịch chữ trong ảnh, game, video</h4>
+    <ol>
+      <li>Nhấn nhanh <kbd class="fixed">Shift</kbd> <kbd class="fixed">Shift</kbd> (hoặc chuột phải icon khay → Chọn vùng màn hình)</li>
+      <li>Kéo chuột khoanh vùng có chữ, thả ra là dịch</li>
+      <li>Chữ khó đọc? Bấm <b>Thử với Claude</b> trong popup</li>
     </ol>
     <h4>Lấy API key</h4>
     <ol>
@@ -77,6 +94,7 @@
       <li>Mở <b>API Keys → Create Key</b>, copy key</li>
       <li>Dán vào tab Cài đặt → bấm <b>Lưu</b></li>
     </ol>
+    <p>Chế độ <b>Google</b> không cần API key.</p>
     <p>Chuột trái vào icon MTrans ở khay hệ thống để tạm tắt/bật lại. Chuột phải để mở menu.</p>
     <div class="credit">Created by Mondiro</div>
   </div>

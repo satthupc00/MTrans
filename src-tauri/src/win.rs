@@ -5,25 +5,30 @@
 use std::sync::atomic::{AtomicBool, AtomicU8};
 
 pub enum HookEvent {
-    /// The trigger key was double-tapped.
+    /// The "translate selection" key was double-tapped.
     Trigger,
+    /// Shift was double-tapped: pick a screen region to translate.
+    Capture,
     /// A mouse button went down at this physical screen point.
     MouseDown(i32, i32),
     /// Escape was pressed.
     Escape,
 }
 
-/// Double-tap detection is on.
+/// Double-tap on the text key translates the selection.
 pub static ENABLED: AtomicBool = AtomicBool::new(true);
-/// 0 = Ctrl, 1 = Alt, 2 = Shift.
+/// Double-tap Shift starts a screen-region translation.
+pub static CAPTURE_ENABLED: AtomicBool = AtomicBool::new(true);
+/// Text key: 0 = Ctrl, 1 = Alt.
 pub static MODIFIER: AtomicU8 = AtomicU8::new(0);
 /// The popup is on screen (mouse clicks / Esc are reported only then).
 pub static POPUP_VISIBLE: AtomicBool = AtomicBool::new(false);
+/// The region picker is on screen (Esc is reported).
+pub static CAPTURE_VISIBLE: AtomicBool = AtomicBool::new(false);
 
 pub fn modifier_code(name: &str) -> u8 {
     match name {
         "alt" => 1,
-        "shift" => 2,
         _ => 0,
     }
 }
@@ -63,10 +68,12 @@ mod imp {
 
     #[derive(Default)]
     struct Tap {
-        held: bool,
+        /// Key class being held: 1 = text key, 2 = Shift (capture).
+        held: u8,
         clean: bool,
         down_at: u32,
-        last_tap: Option<u32>,
+        /// (class, time) of the previous clean tap.
+        last_tap: Option<(u8, u32)>,
     }
 
     thread_local! {
@@ -76,14 +83,29 @@ mod imp {
     const TAP_MAX_MS: u32 = 350; // one press must be shorter than this
     const GAP_MAX_MS: u32 = 450; // two taps must be closer than this
 
-    fn is_modifier(vk: u32) -> bool {
-        let m = MODIFIER.load(Ordering::Relaxed);
-        match m {
-            1 => vk == VK_MENU.0 as u32 || vk == VK_LMENU.0 as u32 || vk == VK_RMENU.0 as u32,
-            2 => vk == VK_SHIFT.0 as u32 || vk == VK_LSHIFT.0 as u32 || vk == VK_RSHIFT.0 as u32,
-            _ => {
-                vk == VK_CONTROL.0 as u32 || vk == VK_LCONTROL.0 as u32 || vk == VK_RCONTROL.0 as u32
-            }
+    fn is_ctrl(vk: u32) -> bool {
+        vk == VK_CONTROL.0 as u32 || vk == VK_LCONTROL.0 as u32 || vk == VK_RCONTROL.0 as u32
+    }
+    fn is_alt(vk: u32) -> bool {
+        vk == VK_MENU.0 as u32 || vk == VK_LMENU.0 as u32 || vk == VK_RMENU.0 as u32
+    }
+    fn is_shift(vk: u32) -> bool {
+        vk == VK_SHIFT.0 as u32 || vk == VK_LSHIFT.0 as u32 || vk == VK_RSHIFT.0 as u32
+    }
+
+    /// Which tap class a key belongs to right now (0 = none).
+    fn class_of(vk: u32) -> u8 {
+        let text_on = ENABLED.load(Ordering::Relaxed);
+        let text_key = match MODIFIER.load(Ordering::Relaxed) {
+            1 => is_alt(vk),
+            _ => is_ctrl(vk),
+        };
+        if text_on && text_key {
+            1
+        } else if CAPTURE_ENABLED.load(Ordering::Relaxed) && is_shift(vk) {
+            2
+        } else {
+            0
         }
     }
 
@@ -104,44 +126,52 @@ mod imp {
                 let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
                 let up = msg == WM_KEYUP || msg == WM_SYSKEYUP;
                 let vk = k.vkCode;
-                if down && vk == VK_ESCAPE.0 as u32 && POPUP_VISIBLE.load(Ordering::Relaxed) {
+                if down
+                    && vk == VK_ESCAPE.0 as u32
+                    && (POPUP_VISIBLE.load(Ordering::Relaxed) || CAPTURE_VISIBLE.load(Ordering::Relaxed))
+                {
                     send(HookEvent::Escape);
                 }
-                if ENABLED.load(Ordering::Relaxed) {
-                    let time = k.time;
-                    let is_mod = is_modifier(vk);
-                    let mut fire = false;
-                    TAP.with(|t| {
-                        let mut t = t.borrow_mut();
-                        if down {
-                            if is_mod {
-                                if !t.held {
-                                    t.held = true;
-                                    t.down_at = time;
-                                    t.clean = true;
-                                }
-                            } else {
-                                t.clean = false;
-                                t.last_tap = None;
-                            }
-                        } else if up && is_mod && t.held {
-                            t.held = false;
-                            if t.clean && time.wrapping_sub(t.down_at) < TAP_MAX_MS {
-                                match t.last_tap {
-                                    Some(prev) if time.wrapping_sub(prev) <= GAP_MAX_MS => {
-                                        t.last_tap = None;
-                                        fire = true;
-                                    }
-                                    _ => t.last_tap = Some(time),
-                                }
-                            } else {
-                                t.last_tap = None;
-                            }
+                let time = k.time;
+                let class = class_of(vk);
+                let mut fire = 0u8;
+                TAP.with(|t| {
+                    let mut t = t.borrow_mut();
+                    if down {
+                        if class != 0 && t.held == 0 {
+                            t.held = class;
+                            t.down_at = time;
+                            t.clean = true;
+                        } else if class == 0 || class != t.held {
+                            // Any other key (or a second modifier) spoils the tap.
+                            t.clean = false;
+                            t.last_tap = None;
                         }
-                    });
-                    if fire {
-                        send(HookEvent::Trigger);
+                    } else if up && class != 0 && class == t.held {
+                        t.held = 0;
+                        if t.clean && time.wrapping_sub(t.down_at) < TAP_MAX_MS {
+                            match t.last_tap {
+                                Some((c, prev)) if c == class && time.wrapping_sub(prev) <= GAP_MAX_MS => {
+                                    t.last_tap = None;
+                                    fire = class;
+                                }
+                                _ => t.last_tap = Some((class, time)),
+                            }
+                        } else {
+                            t.last_tap = None;
+                        }
+                    } else if up && t.held != 0 && class == 0 && !is_ctrl(vk) && !is_alt(vk) && !is_shift(vk) {
+                        // ignore releases of ordinary keys
+                    } else if up && t.held != 0 && class != t.held {
+                        t.held = 0;
+                        t.clean = false;
+                        t.last_tap = None;
                     }
+                });
+                match fire {
+                    1 => send(HookEvent::Trigger),
+                    2 => send(HookEvent::Capture),
+                    _ => {}
                 }
             }
         }
@@ -327,6 +357,99 @@ mod imp {
         }
     }
 
+    /// Copy a rectangle of the screen (physical pixels, virtual-screen coordinates).
+    /// Returns top-down BGRA pixels.
+    pub fn capture_screen(x: i32, y: i32, w: i32, h: i32) -> Option<Vec<u8>> {
+        use windows::Win32::Graphics::Gdi::*;
+        if w <= 0 || h <= 0 {
+            return None;
+        }
+        unsafe {
+            let screen = GetDC(None);
+            let mem = CreateCompatibleDC(Some(screen));
+            let bmi = BITMAPINFO {
+                bmiHeader: BITMAPINFOHEADER {
+                    biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                    biWidth: w,
+                    biHeight: -h,
+                    biPlanes: 1,
+                    biBitCount: 32,
+                    biCompression: BI_RGB.0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
+            let out = match CreateDIBSection(Some(mem), &bmi, DIB_RGB_COLORS, &mut bits, None, 0) {
+                Ok(bmp) if !bits.is_null() => {
+                    let old = SelectObject(mem, bmp.into());
+                    let ok = BitBlt(mem, 0, 0, w, h, Some(screen), x, y, SRCCOPY | CAPTUREBLT).is_ok();
+                    let data = ok.then(|| std::slice::from_raw_parts(bits as *const u8, (w * h * 4) as usize).to_vec());
+                    SelectObject(mem, old);
+                    let _ = DeleteObject(bmp.into());
+                    data
+                }
+                _ => None,
+            };
+            let _ = DeleteDC(mem);
+            ReleaseDC(None, screen);
+            out
+        }
+    }
+
+    fn upscale2(bgra: &[u8], w: u32, h: u32) -> Vec<u8> {
+        let (nw, nh) = (w * 2, h * 2);
+        let mut out = vec![0u8; (nw * nh * 4) as usize];
+        for y in 0..nh {
+            for x in 0..nw {
+                let s = (((y / 2) * w + x / 2) * 4) as usize;
+                let d = ((y * nw + x) * 4) as usize;
+                out[d..d + 4].copy_from_slice(&bgra[s..s + 4]);
+            }
+        }
+        out
+    }
+
+    /// Read text in a BGRA image with the OCR engine built into Windows.
+    /// Err("nolang") when no suitable OCR language is installed.
+    pub fn ocr(bgra: &[u8], w: u32, h: u32) -> Result<String, String> {
+        use windows::core::HSTRING;
+        use windows::Globalization::Language;
+        use windows::Graphics::Imaging::{BitmapPixelFormat, SoftwareBitmap};
+        use windows::Media::Ocr::OcrEngine;
+        use windows::Storage::Streams::DataWriter;
+        use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        }
+        let engine = Language::CreateLanguage(&HSTRING::from("en-US"))
+            .and_then(|l| OcrEngine::TryCreateFromLanguage(&l))
+            .or_else(|_| OcrEngine::TryCreateFromUserProfileLanguages())
+            .map_err(|_| "nolang".to_string())?;
+        let max = OcrEngine::MaxImageDimension().unwrap_or(2600);
+        // Small text reads much better when enlarged.
+        let (buf, w, h) = if w.max(h) * 2 <= max && h < 400 {
+            (upscale2(bgra, w, h), w * 2, h * 2)
+        } else if w.max(h) <= max {
+            (bgra.to_vec(), w, h)
+        } else {
+            return Err("Vùng chọn quá lớn, hãy chọn nhỏ hơn".into());
+        };
+        let run = || -> windows::core::Result<String> {
+            let writer = DataWriter::new()?;
+            writer.WriteBytes(&buf)?;
+            let ibuf = writer.DetachBuffer()?;
+            let bmp = SoftwareBitmap::CreateCopyFromBuffer(&ibuf, BitmapPixelFormat::Bgra8, w as i32, h as i32)?;
+            let result = engine.RecognizeAsync(&bmp)?.get()?;
+            let mut lines = Vec::new();
+            for line in result.Lines()? {
+                lines.push(line.Text()?.to_string());
+            }
+            Ok(lines.join("\n"))
+        };
+        run().map_err(|e| format!("Không đọc được ảnh: {}", e.message()))
+    }
+
     pub fn hide_window(hwnd_raw: isize) {
         unsafe {
             let _ = ShowWindow(HWND(hwnd_raw as _), SW_HIDE);
@@ -369,6 +492,12 @@ mod stub {
     }
     pub fn show_no_activate(_hwnd: isize) {}
     pub fn hide_window(_hwnd: isize) {}
+    pub fn capture_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>> {
+        None
+    }
+    pub fn ocr(_bgra: &[u8], _w: u32, _h: u32) -> Result<String, String> {
+        Err("nolang".into())
+    }
     pub fn protect(d: &[u8]) -> Option<Vec<u8>> {
         Some(d.to_vec())
     }

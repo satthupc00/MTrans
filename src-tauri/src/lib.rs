@@ -1,4 +1,5 @@
 mod claude;
+mod google;
 mod settings;
 mod updater;
 mod win;
@@ -21,6 +22,27 @@ const TRAY_OFF: &[u8] = include_bytes!("../icons/tray-off.png");
 const POPUP_WIDTH: f64 = 320.0;
 const CACHE_MAX: usize = 5000;
 
+/// One HTTP client for the whole app so connections are kept alive and reused.
+pub(crate) fn http() -> &'static reqwest::Client {
+    static C: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    C.get_or_init(|| {
+        reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .timeout(std::time::Duration::from_secs(120))
+            .pool_idle_timeout(std::time::Duration::from_secs(90))
+            .tcp_keepalive(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default()
+    })
+}
+
+/// The last screen region the user picked (top-down BGRA).
+struct Shot {
+    bgra: Vec<u8>,
+    w: u32,
+    h: u32,
+}
+
 #[derive(Default)]
 struct PopupState {
     anchor: (i32, i32),
@@ -40,6 +62,7 @@ struct AppState {
     popup: Mutex<PopupState>,
     tray: Mutex<Option<Tray>>,
     update: Mutex<Option<UpdateInfo>>,
+    shot: Mutex<Option<Shot>>,
 }
 
 // ---------------------------------------------------------------- cache
@@ -86,11 +109,15 @@ fn classify(text: &str) -> (String, &'static str) {
 }
 
 fn popup_begin(app: &AppHandle, text: String) {
-    let state = app.state::<AppState>();
     let (text, mode) = classify(&text);
+    popup_open(app, text, mode, win::cursor_pos());
+}
+
+fn popup_open(app: &AppHandle, text: String, mode: &'static str, anchor: (i32, i32)) {
+    let state = app.state::<AppState>();
     let seq = {
         let mut p = state.popup.lock().unwrap();
-        p.anchor = win::cursor_pos();
+        p.anchor = anchor;
         p.pending_show = true;
         p.seq += 1;
         p.seq
@@ -160,6 +187,151 @@ fn place_popup(app: &AppHandle, height_logical: f64) {
     }
 }
 
+// ---------------------------------------------------------------- screen capture
+
+fn start_capture(app: &AppHandle) {
+    let Some(w) = app.get_webview_window("capture") else { return };
+    popup_hide_inner(app);
+    let (cx, cy) = win::cursor_pos();
+    let mon = w
+        .monitor_from_point(cx as f64, cy as f64)
+        .ok()
+        .flatten()
+        .or_else(|| w.primary_monitor().ok().flatten());
+    let Some(m) = mon else { return };
+    let _ = w.set_position(*m.position());
+    let _ = w.set_size(*m.size());
+    let _ = app.emit_to("capture", "mtrans://capture-start", ());
+    win::CAPTURE_VISIBLE.store(true, Ordering::Relaxed);
+    let _ = w.show();
+    let _ = w.set_always_on_top(true);
+    let _ = w.set_focus();
+}
+
+fn capture_hide(app: &AppHandle) {
+    win::CAPTURE_VISIBLE.store(false, Ordering::Relaxed);
+    if let Some(w) = app.get_webview_window("capture") {
+        let _ = w.hide();
+    }
+}
+
+#[tauri::command]
+fn capture_cancel(app: AppHandle) {
+    capture_hide(&app);
+}
+
+/// The user finished dragging: (x, y, w, h) in CSS pixels of the overlay.
+#[tauri::command]
+fn capture_region(app: AppHandle, x: f64, y: f64, w: f64, h: f64) {
+    let Some(win_) = app.get_webview_window("capture") else { return };
+    let scale = win_.scale_factor().unwrap_or(1.0);
+    let origin = win_.outer_position().unwrap_or_default();
+    let px = origin.x + (x * scale).round() as i32;
+    let py = origin.y + (y * scale).round() as i32;
+    let pw = (w * scale).round() as i32;
+    let ph = (h * scale).round() as i32;
+    capture_hide(&app);
+    let app2 = app.clone();
+    std::thread::spawn(move || {
+        // Let the overlay disappear from the screen before copying it.
+        std::thread::sleep(std::time::Duration::from_millis(90));
+        let Some(bgra) = win::capture_screen(px, py, pw, ph) else { return };
+        *app2.state::<AppState>().shot.lock().unwrap() = Some(Shot { bgra, w: pw as u32, h: ph as u32 });
+        // Popup goes right under the picked region (place_popup offsets from the anchor).
+        let anchor = (px + (24.0 * scale) as i32, py + ph - (10.0 * scale) as i32);
+        popup_open(&app2, String::new(), "image", anchor);
+    });
+}
+
+#[derive(Serialize, Clone)]
+#[serde(tag = "t", content = "text", rename_all = "lowercase")]
+enum ImgMsg {
+    /// Text read from the image.
+    Ocr(String),
+    /// A piece of the translation (Claude streams; OCR + Google sends it whole).
+    Delta(String),
+}
+
+fn shot_png_b64(shot: &Shot) -> Option<String> {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    let mut rgba = shot.bgra.clone();
+    for px in rgba.chunks_exact_mut(4) {
+        px.swap(0, 2);
+        px[3] = 255;
+    }
+    let mut out = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut out, shot.w, shot.h);
+        enc.set_color(png::ColorType::Rgba);
+        enc.set_depth(png::BitDepth::Eight);
+        let mut wr = enc.write_header().ok()?;
+        wr.write_image_data(&rgba).ok()?;
+    }
+    Some(STANDARD.encode(out))
+}
+
+#[tauri::command]
+async fn translate_image(app: AppHandle, engine: String, on_event: Channel<ImgMsg>) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let (key, model, source) = {
+        let s = state.settings.lock().unwrap();
+        (s.api_key(), s.model.clone(), s.source.clone())
+    };
+    let (bgra, w, h) = {
+        let g = state.shot.lock().unwrap();
+        let s = g.as_ref().ok_or("Không có ảnh")?;
+        (s.bgra.clone(), s.w, s.h)
+    };
+    let mut use_claude = engine == "claude" || source == "claude";
+
+    if !use_claude {
+        let ocr = tauri::async_runtime::spawn_blocking(move || win::ocr(&bgra, w, h))
+            .await
+            .map_err(|_| "Không đọc được ảnh".to_string())?;
+        match ocr {
+            Ok(text) => {
+                let text = text.trim().to_string();
+                if text.is_empty() {
+                    return Err("notext".into());
+                }
+                let _ = on_event.send(ImgMsg::Ocr(text.clone()));
+                match google::sentence(&text).await {
+                    Ok(t) => {
+                        let _ = on_event.send(ImgMsg::Delta(t));
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        let Some(k) = key.as_ref() else { return Err(e) };
+                        claude::stream(k, &model, &claude::Kind::Sentence, &text, |t| {
+                            let _ = on_event.send(ImgMsg::Delta(t.to_string()));
+                        })
+                        .await?;
+                        return Ok(());
+                    }
+                }
+            }
+            Err(e) if e == "nolang" && key.is_some() => use_claude = true,
+            Err(e) if e == "nolang" => {
+                return Err("Windows chưa có gói đọc chữ tiếng Anh. Thêm English trong Settings › Time & Language › Language, hoặc dùng Claude.".into())
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    if use_claude {
+        let key = key.ok_or("nokey")?;
+        let b64 = {
+            let g = state.shot.lock().unwrap();
+            g.as_ref().and_then(shot_png_b64).ok_or("Không đọc được ảnh")?
+        };
+        claude::image(&key, &model, &b64, |t| {
+            let _ = on_event.send(ImgMsg::Delta(t.to_string()));
+        })
+        .await?;
+    }
+    Ok(())
+}
+
 fn click_is_outside_popup(app: &AppHandle, x: i32, y: i32) -> bool {
     let Some(w) = app.get_webview_window("popup") else { return true };
     match (w.outer_position(), w.outer_size()) {
@@ -167,6 +339,18 @@ fn click_is_outside_popup(app: &AppHandle, x: i32, y: i32) -> bool {
             !(x >= p.x && y >= p.y && x < p.x + s.width as i32 && y < p.y + s.height as i32)
         }
         _ => true,
+    }
+}
+
+/// Open the connection to Claude while the selection is being read, when Claude
+/// may be used (saves the TLS handshake on the real request).
+fn warm_up_claude(app: &AppHandle) {
+    let (key, source) = {
+        let s = app.state::<AppState>().settings.lock().unwrap().clone();
+        (s.api_key(), s.source)
+    };
+    if let (Some(key), false) = (key, source == "google") {
+        tauri::async_runtime::spawn(async move { claude::warm_up(&key).await });
     }
 }
 
@@ -228,13 +412,14 @@ fn set_enabled_inner(app: &AppHandle, on: bool) {
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let s = app.state::<AppState>().settings.lock().unwrap().clone();
     let toggle = CheckMenuItem::with_id(app, "toggle", format!("Dịch bằng {} × 2", s.hotkey_label()), true, s.enabled, None::<&str>)?;
+    let capture = MenuItem::with_id(app, "capture", "Chọn vùng màn hình để dịch", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
     let help = MenuItem::with_id(app, "help", "Trợ giúp", true, None::<&str>)?;
     let update = MenuItem::with_id(app, "update", "Kiểm tra cập nhật", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Thoát MTrans", true, None::<&str>)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&toggle, &sep1, &settings, &help, &update, &sep2, &quit])?;
+    let menu = Menu::with_items(app, &[&toggle, &capture, &sep1, &settings, &help, &update, &sep2, &quit])?;
     let icon = TrayIconBuilder::with_id("main")
         .icon(Image::from_bytes(if s.enabled { TRAY_ON } else { TRAY_OFF })?)
         .tooltip("MTrans")
@@ -245,6 +430,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 let on = !app.state::<AppState>().settings.lock().unwrap().enabled;
                 set_enabled_inner(app, on);
             }
+            "capture" => start_capture(app),
             "settings" => open_settings_inner(app, "set"),
             "help" => open_settings_inner(app, "help"),
             "update" => {
@@ -273,6 +459,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 struct SettingsView {
     enabled: bool,
     hotkey: String,
+    source: String,
+    capture_enabled: bool,
     model: String,
     has_key: bool,
     key_hint: String,
@@ -294,6 +482,8 @@ fn get_settings(app: AppHandle, state: State<AppState>) -> SettingsView {
     SettingsView {
         enabled: s.enabled,
         hotkey: s.hotkey.clone(),
+        source: s.source.clone(),
+        capture_enabled: s.capture_enabled,
         model: s.model.clone(),
         has_key: key.is_some(),
         key_hint: hint,
@@ -311,13 +501,30 @@ fn set_enabled(app: AppHandle, on: bool) {
 fn set_hotkey(app: AppHandle, state: State<AppState>, hotkey: String) {
     {
         let mut s = state.settings.lock().unwrap();
-        s.hotkey = match hotkey.as_str() {
-            "alt" | "shift" => hotkey.clone(),
-            _ => "ctrl".into(),
-        };
+        s.hotkey = if hotkey == "alt" { "alt".into() } else { "ctrl".into() };
         win::MODIFIER.store(win::modifier_code(&s.hotkey), Ordering::Relaxed);
         s.save(&app);
     }
+    refresh_tray(&app);
+}
+
+#[tauri::command]
+fn set_source(app: AppHandle, state: State<AppState>, source: String) {
+    if ["mix", "google", "claude"].contains(&source.as_str()) {
+        let mut s = state.settings.lock().unwrap();
+        s.source = source;
+        s.save(&app);
+    }
+}
+
+#[tauri::command]
+fn set_capture_enabled(app: AppHandle, state: State<AppState>, on: bool) {
+    {
+        let mut s = state.settings.lock().unwrap();
+        s.capture_enabled = on;
+        s.save(&app);
+    }
+    win::CAPTURE_ENABLED.store(on, Ordering::Relaxed);
     refresh_tray(&app);
 }
 
@@ -359,28 +566,72 @@ async fn test_saved_key(app: AppHandle) -> Result<(), String> {
     }
 }
 
+/// Which engine serves a request: Google for quick text in "mix"/"google" modes,
+/// Claude for the More details in "mix" mode and for everything in "claude" mode.
+fn wants_google(source: &str, kind: &claude::Kind, has_key: bool) -> bool {
+    match source {
+        "google" => true,
+        "claude" => !has_key,
+        _ => !matches!(kind, claude::Kind::Detail) || !has_key,
+    }
+}
+
+async fn google_for(kind: &claude::Kind, text: &str) -> Result<String, String> {
+    match kind {
+        claude::Kind::Short => google::short(text).await,
+        claude::Kind::Detail => google::detail(text).await,
+        claude::Kind::Sentence => google::sentence(text).await,
+    }
+}
+
 #[tauri::command]
 async fn translate(app: AppHandle, text: String, kind: String, on_event: Channel<String>) -> Result<String, String> {
     let k = claude::Kind::parse(&kind).ok_or("kind")?;
     let state = app.state::<AppState>();
-    let (key, model) = {
+    let (key, model, source) = {
         let s = state.settings.lock().unwrap();
-        (s.api_key(), s.model.clone())
+        (s.api_key(), s.model.clone(), s.source.clone())
     };
-    let Some(key) = key else { return Err("nokey".into()) };
+    if source == "claude" && key.is_none() {
+        return Err("nokey".into());
+    }
+    let google_first = wants_google(&source, &k, key.is_some());
+    let engine = if google_first { "google".to_string() } else { model.clone() };
     let cache_key = match k {
         claude::Kind::Sentence => None,
-        _ => Some(format!("{kind}|{model}|{}", text.to_lowercase())),
+        _ => Some(format!("{kind}|{engine}|{}", text.to_lowercase())),
     };
     if let Some(ck) = &cache_key {
         if let Some(hit) = state.cache.lock().unwrap().get(ck) {
             return Ok(hit.clone());
         }
     }
-    let full = claude::stream(&key, &model, &k, &text, |t| {
-        let _ = on_event.send(t.to_string());
-    })
-    .await?;
+
+    let full = if google_first {
+        match google_for(&k, &text).await {
+            Ok(t) => {
+                let _ = on_event.send(t.clone());
+                t
+            }
+            // Google refused or is unreachable: fall back to Claude when possible.
+            Err(e) => match key.as_ref() {
+                Some(key) => {
+                    claude::stream(key, &model, &k, &text, |t| {
+                        let _ = on_event.send(t.to_string());
+                    })
+                    .await?
+                }
+                None => return Err(e),
+            },
+        }
+    } else {
+        let key = key.ok_or("nokey")?;
+        claude::stream(&key, &model, &k, &text, |t| {
+            let _ = on_event.send(t.to_string());
+        })
+        .await?
+    };
+
     if let Some(ck) = cache_key {
         if !full.trim().is_empty() {
             let mut c = state.cache.lock().unwrap();
@@ -457,6 +708,7 @@ pub fn run() {
             let mut s = Settings::load(&handle);
             win::ENABLED.store(s.enabled, Ordering::Relaxed);
             win::MODIFIER.store(win::modifier_code(&s.hotkey), Ordering::Relaxed);
+            win::CAPTURE_ENABLED.store(s.capture_enabled, Ordering::Relaxed);
             let first_run = !s.first_run_done;
             if first_run {
                 let _ = handle.autolaunch().enable();
@@ -470,6 +722,7 @@ pub fn run() {
                 popup: Mutex::new(PopupState::default()),
                 tray: Mutex::new(None),
                 update: Mutex::new(None),
+                shot: Mutex::new(None),
             });
             build_tray(&handle)?;
 
@@ -481,16 +734,23 @@ pub fn run() {
                 for ev in rx {
                     match ev {
                         win::HookEvent::Trigger => {
+                            warm_up_claude(&worker);
                             if let Some(text) = win::grab_selected_text() {
                                 popup_begin(&worker, text);
                             }
                         }
+                        win::HookEvent::Capture => start_capture(&worker),
                         win::HookEvent::MouseDown(x, y) => {
                             if click_is_outside_popup(&worker, x, y) {
                                 popup_hide_inner(&worker);
                             }
                         }
-                        win::HookEvent::Escape => popup_hide_inner(&worker),
+                        win::HookEvent::Escape => {
+                            if win::CAPTURE_VISIBLE.load(Ordering::Relaxed) {
+                                capture_hide(&worker);
+                            }
+                            popup_hide_inner(&worker);
+                        }
                     }
                 }
             });
@@ -528,6 +788,11 @@ pub fn run() {
             save_api_key,
             test_saved_key,
             translate,
+            translate_image,
+            capture_region,
+            capture_cancel,
+            set_source,
+            set_capture_enabled,
             popup_resize,
             popup_hide,
             open_settings,
