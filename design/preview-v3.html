@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MTrans – Preview v1.1</title>
+<link rel="stylesheet" href="../src/common.css">
+<link rel="stylesheet" href="../src/popup.css">
+<link rel="stylesheet" href="../src/settings.css">
+<style>
+html,body{overflow:auto;user-select:auto;background:#15161A}
+.page{max-width:1180px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:20px;margin:0 0 4px}
+.lead{color:var(--muted);margin:0 0 26px}
+.sec{margin:0 0 42px}
+.sec>h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.sec>h2 .n{background:var(--red);color:#fff;border-radius:50%;width:20px;height:20px;display:grid;place-items:center;font-size:11px}
+.sec>p{color:var(--muted);margin:0 0 14px;max-width:780px}
+.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.page .pop{background:var(--chrome);border:1px solid var(--line);border-radius:9px;box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.size,.hintbar{z-index:2}
+.cap{color:var(--muted);font-size:11.5px;margin:8px 0 0;text-align:center}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;max-width:430px;color:#C9CCD2}
+.note b{color:#fff}.note ul{margin:6px 0 0;padding-left:18px}
+
+/* fake screen */
+.screen{position:relative;width:720px;max-width:100%;height:405px;border-radius:10px;overflow:hidden;cursor:crosshair;
+  background:radial-gradient(circle at 70% 30%,#5b3d8f,#1d1533 60%),#1d1533;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.screen .art{position:absolute;right:40px;top:40px;width:230px;height:300px;border-radius:12px;
+  background:linear-gradient(160deg,#ffb347,#e5383b 55%,#5b1a3a);opacity:.85}
+.screen .card{position:absolute;left:40px;top:70px;width:330px;padding:16px 18px;border-radius:10px;background:rgba(10,8,20,.72);border:1px solid rgba(255,255,255,.12);color:#fff}
+.screen .card h3{margin:0 0 6px;font:800 20px/1.2 Georgia,serif;letter-spacing:.02em;color:#FFD27A}
+.screen .card p{margin:0;font:14px/1.5 Georgia,serif;color:#EDE6FF}
+.screen .btns{position:absolute;left:40px;bottom:40px;display:flex;gap:10px}
+.screen .btns span{padding:8px 16px;border-radius:6px;background:#FFD27A;color:#2a1b00;font:700 13px "Segoe UI"}
+.screen .btns span+span{background:rgba(255,255,255,.12);color:#fff}
+.sel{position:absolute;left:30px;top:60px;width:350px;height:132px;border:1.5px solid var(--red);
+  box-shadow:0 0 0 9999px rgba(10,10,14,.55);border-radius:2px}
+.sel i{position:absolute;width:7px;height:7px;background:#fff;border:1.5px solid var(--red);border-radius:2px}
+.sel i:nth-child(1){left:-4px;top:-4px}.sel i:nth-child(2){right:-4px;top:-4px}.sel i:nth-child(3){left:-4px;bottom:-4px}.sel i:nth-child(4){right:-4px;bottom:-4px}
+.size{position:absolute;left:30px;top:36px;font:600 11px "Segoe UI";color:#fff;background:var(--red);padding:2px 7px;border-radius:4px;font-variant-numeric:tabular-nums}
+.hintbar{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:rgba(31,33,38,.92);border:1px solid var(--line);
+  border-radius:20px;padding:6px 14px;color:var(--text);font-size:12px;white-space:nowrap;display:flex;gap:10px;align-items:center}
+.hintbar kbd{font-size:10.5px}
+.screen .pop{position:absolute;left:30px;top:204px;box-shadow:0 12px 32px rgba(0,0,0,.5);border:1px solid var(--line);border-radius:9px}
+
+/* image popup bits (new) */
+.ocr{padding:9px 12px 0;color:var(--muted);font-size:11.5px;display:flex;gap:6px;align-items:flex-start}
+.ocr svg{width:12px;height:12px;flex:0 0 auto;margin-top:2px}
+.ocr span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pfoot{display:flex;justify-content:flex-end;padding:0 8px 6px}
+.pfoot .lnk{font-size:11.5px}
+
+/* settings preview */
+.swin{width:420px;max-width:100%;background:var(--chrome);border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.swin .win{height:auto}
+.swin .pane{overflow:visible}
+.new{outline:1.5px dashed rgba(46,184,114,.7);outline-offset:6px;border-radius:4px}
+.dim{opacity:.45}
+.kbrow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>MTrans · Preview v1.1</h1>
+  <p class="lead">Phần mới: dịch bằng Google, chọn nguồn dịch, và dịch vùng màn hình bằng <kbd>Shift</kbd> <kbd>Shift</kbd>. Viền nét đứt xanh = chỗ mới thêm.</p>
+
+  <section class="sec">
+    <h2><span class="n">1</span>Nhấn <kbd>Shift</kbd> <kbd>Shift</kbd> → kéo chọn vùng có chữ</h2>
+    <p>Màn hình tối lại, con trỏ thành dấu +. Kéo chuột để khoanh vùng: góc trên có số kích thước, vùng chọn sáng rõ. Thả chuột là dịch luôn. <kbd>Esc</kbd> hoặc chuột phải để huỷ. Có nhiều màn hình thì chọn được trên màn hình đang có chuột.</p>
+    <div class="row">
+      <div><div class="screen">
+        <div class="art"></div>
+        <div class="card"><h3>THE EMBER KNIGHT</h3><p>Forged in the dying flames of the old kingdom, she wanders the ashen roads seeking the last ember of hope.</p></div>
+        <div class="btns"><span>Start Quest</span><span>Inventory</span></div>
+        <div class="hintbar">Kéo để chọn vùng cần dịch <span style="color:var(--muted)">·</span> <kbd>Esc</kbd> huỷ</div>
+        <div class="size">350 × 132</div>
+        <div class="sel"><i></i><i></i><i></i><i></i></div>
+      </div><p class="cap">Đang kéo chọn vùng (ví dụ 1 artwork game có chữ)</p></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">2</span>Popup kết quả dịch ảnh</h2>
+    <p>Popup hiện ngay dưới vùng vừa chọn. Dòng nhỏ trên cùng là chữ máy đọc được từ ảnh (để bạn so xem đọc đúng chưa), bên dưới là bản dịch. Nếu ảnh khó đọc, bấm <b>Thử với Claude</b> để gửi ảnh cho Claude đọc + dịch lại.</p>
+    <div class="row">
+      <div><div class="pop" style="animation:none">
+        <div class="ocr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg><span>THE EMBER KNIGHT Forged in the dying flames of the old kingdom, she wanders the ashen roads seeking the last ember of hope.</span></div>
+        <div class="sent">HIỆP SĨ THAN HỒNG. Được rèn trong ngọn lửa tàn của vương quốc cũ, nàng lang thang trên những con đường phủ tro, tìm kiếm tàn lửa hy vọng cuối cùng.</div>
+        <div class="pfoot"><button class="lnk">Thử với Claude</button></div>
+      </div><p class="cap">Dịch xong (Google)</p></div>
+      <div><div class="pop" style="animation:none">
+        <div class="sent" style="color:var(--muted)"><span class="load"><i></i><i></i><i></i></span> Đang đọc chữ trong ảnh…</div>
+      </div><p class="cap">Đang đọc ảnh</p></div>
+      <div><div class="pop" style="animation:none">
+        <div class="err"><span class="dot"></span><span>Không thấy chữ trong vùng này</span></div>
+      </div><p class="cap">Vùng không có chữ</p></div>
+      <div class="note"><b>Popup chữ thường cũng có thêm:</b>
+        <ul>
+          <li>Chế độ Kết hợp: popup gọn và dịch câu dùng Google (gần như tức thì). Bấm <b>More</b> mới hỏi Claude để có phiên âm, nghĩa theo loại từ và ví dụ.</li>
+          <li>Chế độ chỉ Google: More hiện từ điển của Google (loại từ + nghĩa), không có phiên âm.</li>
+          <li>Nếu Google lỗi hoặc bị chặn, app tự chuyển sang Claude (khi có key).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2><span class="n">3</span>Cài đặt</h2>
+    <p>Thêm mục <b>Nguồn dịch</b> và <b>Dịch vùng màn hình</b>. Phím dịch chữ bôi đen giờ chỉ còn Ctrl/Alt vì Shift × 2 dành cho chụp vùng. Ở chế độ chỉ Google, phần API key và model mờ đi (không bắt buộc).</p>
+    <div class="row">
+      <div class="swin"><div class="win">
+        <div class="tb">
+          <div class="tabs"><button class="tab on">Cài đặt</button><button class="tab">Trợ giúp</button><span class="ind" style="left:6px;width:72px"></span></div>
+          <div class="sp"></div>
+          <button class="cls" title="Đóng"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.2"><path d="M1 1l10 10M11 1L1 11"/></svg></button>
+        </div>
+        <div class="pane on">
+          <div class="grp new"><span class="lbl">Nguồn dịch</span>
+            <div class="seg"><button class="on">Kết hợp</button><button>Google</button><button>Claude</button></div>
+            <p class="hint">Google cho bản dịch nhanh, Claude khi bấm More. Khuyên dùng.</p>
+          </div>
+          <div class="grp">
+            <label class="sw"><span>Dịch chữ bôi đen<small>Bôi đen rồi nhấn nhanh phím 2 lần</small></span><input type="checkbox" class="tg" checked></label>
+            <div class="seg"><button class="on">Ctrl × 2</button><button>Alt × 2</button></div>
+          </div>
+          <div class="grp new">
+            <label class="sw"><span>Dịch vùng màn hình<small>Nhấn <kbd>Shift</kbd> <kbd>Shift</kbd> rồi kéo chọn vùng có chữ</small></span><input type="checkbox" class="tg" checked></label>
+          </div>
+          <div class="grp"><label class="lbl">Claude API key</label>
+            <div class="field"><input type="password" placeholder="Đã lưu (sk-ant-…a1B2) · dán key mới để thay"><button class="btn sm">Lưu</button></div>
+            <p class="hint ok">✓ Đã có API key</p>
+          </div>
+          <div class="grp"><label class="lbl">Model Claude</label>
+            <select><option>Haiku 5.5 — nhanh nhất, rẻ nhất (khuyên dùng)</option></select>
+          </div>
+          <div class="grp"><label class="sw"><span>Khởi động cùng Windows</span><input type="checkbox" class="tg" checked></label></div>
+          <div class="grp"><span class="lbl">Phiên bản</span>
+            <div class="ver"><span class="v">v1.1.0</span><span class="latest">latest</span><span class="sp"></span><button class="btn">What's new</button></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
