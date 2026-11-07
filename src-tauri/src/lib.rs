@@ -65,6 +65,7 @@ struct AppState {
     tray: Mutex<Option<Tray>>,
     update: Mutex<Option<UpdateInfo>>,
     shot: Mutex<Option<Shot>>,
+    frame: Mutex<Option<Frame>>,
 }
 
 // ---------------------------------------------------------------- cache
@@ -191,9 +192,29 @@ fn place_popup(app: &AppHandle, height_logical: f64) {
 
 // ---------------------------------------------------------------- screen capture
 
+/// The whole monitor, frozen at the moment the capture key was pressed.
+/// The picker shows this still image, so videos playing behind it do not matter
+/// (Chrome stops painting a window it thinks is covered, which turned videos black).
+struct Frame {
+    bgra: Vec<u8>,
+    w: u32,
+    h: u32,
+    /// Monitor top-left on the virtual screen (physical px).
+    ox: i32,
+    oy: i32,
+    seq: u64,
+}
+
 fn start_capture(app: &AppHandle) {
     let Some(w) = app.get_webview_window("capture") else { return };
-    popup_hide_inner(app);
+    if win::CAPTURE_VISIBLE.load(Ordering::Relaxed) {
+        return;
+    }
+    if win::POPUP_VISIBLE.load(Ordering::Relaxed) {
+        popup_hide_inner(app);
+        // Let the popup leave the screen before taking the still image.
+        std::thread::sleep(std::time::Duration::from_millis(60));
+    }
     let (cx, cy) = win::cursor_pos();
     let mon = w
         .monitor_from_point(cx as f64, cy as f64)
@@ -201,13 +222,48 @@ fn start_capture(app: &AppHandle) {
         .flatten()
         .or_else(|| w.primary_monitor().ok().flatten());
     let Some(m) = mon else { return };
-    let _ = w.set_position(*m.position());
-    let _ = w.set_size(*m.size());
-    let _ = app.emit_to("capture", "mtrans://capture-start", ());
+    let (pos, size) = (*m.position(), *m.size());
+    // Take the still image first, while nothing of ours covers the screen.
+    let Some(bgra) = win::capture_screen(pos.x, pos.y, size.width as i32, size.height as i32) else { return };
+    let state = app.state::<AppState>();
+    let seq = {
+        let mut f = state.frame.lock().unwrap();
+        let seq = f.as_ref().map(|f| f.seq + 1).unwrap_or(1);
+        *f = Some(Frame { bgra, w: size.width, h: size.height, ox: pos.x, oy: pos.y, seq });
+        seq
+    };
     win::CAPTURE_VISIBLE.store(true, Ordering::Relaxed);
-    let _ = w.show();
-    let _ = w.set_always_on_top(true);
-    let _ = w.set_focus();
+    let _ = w.set_position(pos);
+    let _ = w.set_size(size);
+    // The page loads the image, then calls capture_ready to be shown.
+    let _ = app.emit_to("capture", "mtrans://capture-start", seq);
+    // Safety net in case the page never answers.
+    let app2 = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(900));
+        let same = app2.state::<AppState>().frame.lock().unwrap().as_ref().map(|f| f.seq) == Some(seq);
+        if same && win::CAPTURE_VISIBLE.load(Ordering::Relaxed) {
+            show_capture(&app2);
+        }
+    });
+}
+
+fn show_capture(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("capture") {
+        if w.is_visible().unwrap_or(false) {
+            return;
+        }
+        let _ = w.show();
+        let _ = w.set_always_on_top(true);
+        let _ = w.set_focus();
+    }
+}
+
+#[tauri::command]
+fn capture_ready(app: AppHandle) {
+    if win::CAPTURE_VISIBLE.load(Ordering::Relaxed) {
+        show_capture(&app);
+    }
 }
 
 fn capture_hide(app: &AppHandle) {
@@ -220,29 +276,64 @@ fn capture_hide(app: &AppHandle) {
 #[tauri::command]
 fn capture_cancel(app: AppHandle) {
     capture_hide(&app);
+    *app.state::<AppState>().frame.lock().unwrap() = None;
 }
 
-/// The user finished dragging: (x, y, w, h) in CSS pixels of the overlay.
+/// The frozen frame as a BMP image for the picker page (served at mtshot://…).
+fn frame_bmp(app: &AppHandle) -> Option<Vec<u8>> {
+    let state = app.state::<AppState>();
+    let g = state.frame.lock().unwrap();
+    let f = g.as_ref()?;
+    let data_len = (f.w * f.h * 4) as usize;
+    let mut out = Vec::with_capacity(54 + data_len);
+    let file_len = 54 + data_len as u32;
+    out.extend_from_slice(b"BM");
+    out.extend_from_slice(&file_len.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&54u32.to_le_bytes());
+    out.extend_from_slice(&40u32.to_le_bytes());
+    out.extend_from_slice(&(f.w as i32).to_le_bytes());
+    out.extend_from_slice(&(-(f.h as i32)).to_le_bytes()); // top-down rows
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&32u16.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes()); // BI_RGB
+    out.extend_from_slice(&(data_len as u32).to_le_bytes());
+    out.extend_from_slice(&2835i32.to_le_bytes());
+    out.extend_from_slice(&2835i32.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&f.bgra);
+    // Screen captures leave alpha at 0; make every pixel opaque.
+    for px in out[54..].chunks_exact_mut(4) {
+        px[3] = 255;
+    }
+    Some(out)
+}
+
+/// The user finished dragging: (x, y, w, h) in CSS pixels of the picker.
 #[tauri::command]
 fn capture_region(app: AppHandle, x: f64, y: f64, w: f64, h: f64) {
     let Some(win_) = app.get_webview_window("capture") else { return };
     let scale = win_.scale_factor().unwrap_or(1.0);
-    let origin = win_.outer_position().unwrap_or_default();
-    let px = origin.x + (x * scale).round() as i32;
-    let py = origin.y + (y * scale).round() as i32;
-    let pw = (w * scale).round() as i32;
-    let ph = (h * scale).round() as i32;
     capture_hide(&app);
-    let app2 = app.clone();
-    std::thread::spawn(move || {
-        // Let the overlay disappear from the screen before copying it.
-        std::thread::sleep(std::time::Duration::from_millis(90));
-        let Some(bgra) = win::capture_screen(px, py, pw, ph) else { return };
-        *app2.state::<AppState>().shot.lock().unwrap() = Some(Shot { bgra, w: pw as u32, h: ph as u32 });
-        // Popup goes right under the picked region (place_popup offsets from the anchor).
-        let anchor = (px + (24.0 * scale) as i32, py + ph - (10.0 * scale) as i32);
-        popup_open(&app2, String::new(), "image", anchor);
-    });
+    let state = app.state::<AppState>();
+    let Some(frame) = state.frame.lock().unwrap().take() else { return };
+    // Crop from the frozen frame (monitor-local physical pixels).
+    let fx = ((x * scale).round() as i64).clamp(0, frame.w as i64 - 1) as u32;
+    let fy = ((y * scale).round() as i64).clamp(0, frame.h as i64 - 1) as u32;
+    let fw = ((w * scale).round() as u32).clamp(1, frame.w - fx);
+    let fh = ((h * scale).round() as u32).clamp(1, frame.h - fy);
+    let mut bgra = Vec::with_capacity((fw * fh * 4) as usize);
+    for row in fy..fy + fh {
+        let start = ((row * frame.w + fx) * 4) as usize;
+        bgra.extend_from_slice(&frame.bgra[start..start + (fw * 4) as usize]);
+    }
+    *state.shot.lock().unwrap() = Some(Shot { bgra, w: fw, h: fh });
+    // Popup goes right under the picked region (place_popup offsets from the anchor).
+    let px = frame.ox + fx as i32;
+    let py = frame.oy + fy as i32;
+    let anchor = (px + (24.0 * scale) as i32, py + fh as i32 - (10.0 * scale) as i32);
+    popup_open(&app, String::new(), "image", anchor);
 }
 
 #[derive(Serialize, Clone)]
@@ -731,6 +822,16 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .register_uri_scheme_protocol("mtshot", |ctx, _req| {
+            let body = frame_bmp(ctx.app_handle()).unwrap_or_default();
+            tauri::http::Response::builder()
+                .status(if body.is_empty() { 404 } else { 200 })
+                .header("Content-Type", "image/bmp")
+                .header("Cache-Control", "no-store")
+                .header("Access-Control-Allow-Origin", "*")
+                .body(std::borrow::Cow::Owned(body))
+                .unwrap()
+        })
         .setup(|app| {
             let handle = app.handle().clone();
             let mut s = Settings::load(&handle);
@@ -752,6 +853,7 @@ pub fn run() {
                 tray: Mutex::new(None),
                 update: Mutex::new(None),
                 shot: Mutex::new(None),
+                frame: Mutex::new(None),
             });
             build_tray(&handle)?;
 
@@ -777,6 +879,7 @@ pub fn run() {
                         win::HookEvent::Escape => {
                             if win::CAPTURE_VISIBLE.load(Ordering::Relaxed) {
                                 capture_hide(&worker);
+                                *worker.state::<AppState>().frame.lock().unwrap() = None;
                             }
                             popup_hide_inner(&worker);
                         }
@@ -821,6 +924,7 @@ pub fn run() {
             translate_image,
             capture_region,
             capture_cancel,
+            capture_ready,
             set_capture_enabled,
             popup_resize,
             popup_hide,

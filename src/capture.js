@@ -33,6 +33,7 @@ function draw(r) {
 
 function cancel() {
   reset();
+  frame.removeAttribute('src');
   invoke('capture_cancel');
 }
 
@@ -56,9 +57,16 @@ window.addEventListener('pointerup', (e) => {
   const r = rect(e);
   if (r.w < 6 || r.h < 6) { reset(); return; } // a click, not a drag: keep picking
   busy = true;
-  invoke('capture_region', r).finally(() => setTimeout(reset, 200));
+  invoke('capture_region', r).finally(() => { reset(); frame.removeAttribute('src'); });
 });
 
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') cancel(); });
 window.addEventListener('contextmenu', (e) => e.preventDefault());
-listen('mtrans://capture-start', reset);
+// Rust froze the screen; show that still image, then ask to be put on screen.
+const frame = document.getElementById('frame');
+listen('mtrans://capture-start', ({ payload }) => {
+  reset();
+  frame.onload = () => invoke('capture_ready');
+  frame.onerror = () => invoke('capture_ready');
+  frame.src = `http://mtshot.localhost/frame?${payload}`;
+});

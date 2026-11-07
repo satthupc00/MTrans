@@ -1,13 +1,11 @@
 {
-  "version": "1.2.0",
-  "date": "2026-11-04",
-  "new": [
-    "Tự đặt phím tắt cho dịch chữ bôi đen và dịch vùng màn hình: chọn Ctrl / Alt / Shift ở ô trái, gõ phím ở ô phải (vd Alt + Q)",
-    "Để trống ô bên phải = nhấn nhanh 2 lần như trước (Ctrl × 2, Shift × 2)"
-  ],
+  "version": "1.2.1",
+  "date": "2026-11-07",
+  "new": [],
   "improved": [
-    "Báo ngay khi phím tắt trùng nhau hoặc trùng phím hay dùng (Ctrl + C, Ctrl + V…)",
-    "Menu ở khay hệ thống hiện phím tắt đang dùng"
+    "Khi chọn vùng để dịch, màn hình đứng hình lại (như Snipping Tool) nên dịch được cả phụ đề video đang chạy"
   ],
-  "fixed": []
+  "fixed": [
+    "Video YouTube không còn bị đen khi nhấn phím dịch vùng màn hình"
+  ]
 }
