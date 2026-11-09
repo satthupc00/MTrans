@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MTrans Mobile – Preview</title>
+<style>
+:root{
+  --chrome:#1F2126;--panel:#26292F;--line:#363A42;--hover:#2F333A;--stage:#2B2D31;
+  --text:#E8E9EC;--muted:#8D929C;--red:#E5383B;--warn:#F2B84B;--selected-bg:#3A2426;--green:#2EB872;
+  --ease-out:cubic-bezier(.22,1,.36,1);--ease-spring:cubic-bezier(.34,1.56,.64,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#121317;color:var(--text);font:14px/1.45 "Segoe UI",Roboto,system-ui,sans-serif}
+.page{max-width:1280px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:20px;margin:0 0 4px}
+.lead{color:var(--muted);margin:0 0 28px;max-width:860px}
+.sec{margin:0 0 46px}
+.sec>h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.sec>h2 .n{background:var(--red);color:#fff;border-radius:50%;width:20px;height:20px;display:grid;place-items:center;font-size:11px}
+.sec>p{color:var(--muted);margin:0 0 16px;max-width:860px}
+.row{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.cap{color:var(--muted);font-size:12px;text-align:center;margin:10px 0 0}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;max-width:380px;color:#C9CCD2}
+.note b{color:#fff}.note ul{margin:6px 0 0;padding-left:18px}.note li{margin:3px 0}
+
+/* phone frames (CSS px close to Z Fold 7) */
+.phone{background:#000;border-radius:34px;padding:10px;box-shadow:0 24px 60px rgba(0,0,0,.6),inset 0 0 0 2px #2a2a2e}
+.outer .scr{width:372px;height:820px}
+.inner .scr{width:820px;height:740px}
+.scr{background:var(--chrome);border-radius:26px;overflow:hidden;position:relative;display:flex;flex-direction:column}
+.status{height:26px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:11.5px;color:#cfd2d8}
+.status .cam{width:9px;height:9px;border-radius:50%;background:#111;box-shadow:0 0 0 2px #222}
+
+/* thin top row: icons on the right (m-skill Android) */
+.topbar{height:42px;flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:2px;padding:0 6px}
+.ib{width:38px;height:38px;border:0;border-radius:50%;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.ib svg{width:20px;height:20px}
+.ib:active{background:var(--hover)}
+.upd{color:var(--green)}
+.latest{font-size:10.5px;font-weight:800;color:var(--green);background:#2eb87224;padding:1px 7px;border-radius:20px;margin-right:2px}
+.chip-off{font-size:11px;font-weight:700;color:var(--warn);background:#f2b84b1f;border-radius:20px;padding:2px 9px;margin-right:auto;margin-left:8px;display:flex;align-items:center;gap:5px}
+.chip-off i{width:6px;height:6px;border-radius:50%;background:var(--warn)}
+
+.body{flex:1;min-height:0;display:flex;flex-direction:column;padding:4px 14px 0;gap:12px;overflow:hidden}
+
+/* language bar */
+.langs{display:grid;grid-template-columns:1fr 44px 1fr;gap:6px;align-items:center}
+.lsel{height:48px;border-radius:12px;background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;padding:0 12px;position:relative}
+.lsel small{font-size:10.5px;color:var(--muted);line-height:1.1}
+.lsel b{font-size:14.5px;color:#fff;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.lsel b svg{width:14px;height:14px;color:var(--muted)}
+.lsel.open{border-color:var(--red);box-shadow:0 0 0 3px rgba(229,56,59,.18)}
+.swap{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:#fff;display:grid;place-items:center}
+.swap svg{width:18px;height:18px}
+.menu{position:absolute;left:-1px;right:-1px;top:52px;background:#2B2E35;border:1px solid var(--line);border-radius:12px;padding:5px;z-index:5;box-shadow:0 12px 28px rgba(0,0,0,.5)}
+.menu div{height:44px;display:flex;align-items:center;padding:0 10px;border-radius:8px;font-size:14px}
+.menu div.on{background:var(--selected-bg);color:#fff;box-shadow:inset 3px 0 0 var(--red)}
+.menu div.dim{color:#5f636c;text-decoration:line-through}
+
+/* text input + result */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;position:relative}
+.inp{min-height:150px;font-size:17px;color:#fff;line-height:1.5}
+.inp .ph{color:#6B707A}
+.inp .tools{position:absolute;right:8px;bottom:8px;display:flex;gap:2px}
+.res{min-height:150px;font-size:17px;color:#fff;line-height:1.5;background:#22252B}
+.res .meta{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)}
+.res .meta .sp{flex:1}
+.lnk{border:0;background:none;color:#E86A6C;font-weight:600;font-size:13px;padding:6px 4px}
+.by{color:#6B707A;font-size:12px}
+.eng{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:1px 8px}
+.eng.off{color:var(--warn);border-color:#f2b84b55}
+
+/* bottom nav */
+.nav{height:64px;flex:0 0 auto;display:flex;border-top:1px solid var(--line);background:var(--chrome);margin-top:auto}
+.nav button{flex:1;border:0;background:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11.5px;font-weight:600;position:relative}
+.nav button svg{width:22px;height:22px}
+.nav button.on{color:#fff}
+.nav button.on::before{content:'';position:absolute;top:0;left:30%;right:30%;height:2px;background:var(--red);border-radius:2px}
+.credit{position:absolute;right:12px;bottom:70px;font-size:10px;color:#5d616a}
+
+/* camera */
+.view{flex:1;min-height:0;position:relative;overflow:hidden;background:#0d0e10}
+.shot{position:absolute;inset:0;background:
+  radial-gradient(ellipse at 30% 20%,rgba(255,210,140,.25),transparent 60%),
+  linear-gradient(180deg,#3b2a20,#1b1410)}
+.sign{position:absolute;border-radius:6px;padding:8px 12px;font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif}
+.s1{left:8%;top:9%;background:#b3261e;color:#ffe7a8;font-size:30px;font-weight:800;letter-spacing:.08em;transform:rotate(-2deg);box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.s2{left:10%;top:31%;right:10%;background:#f4ead6;color:#2b2016;font-size:17px;line-height:1.7;transform:rotate(1deg)}
+.s2 i{font-style:normal;color:#8a6f50;font-size:12px;margin-left:6px}
+.s3{right:8%;top:70%;background:#1d6b3a;color:#fff;font-size:16px;font-weight:700}
+.box{position:absolute;border:2px solid var(--red);border-radius:6px;background:rgba(229,56,59,.08)}
+.box.sel{background:rgba(229,56,59,.22);box-shadow:0 0 0 3px rgba(229,56,59,.35)}
+.over{position:absolute;border-radius:5px;background:#F4F0E8;box-shadow:0 2px 8px rgba(0,0,0,.35);color:#1a1a1a;font-weight:600;display:flex;align-items:center;padding:2px 8px;line-height:1.25}
+.vfui{position:absolute;left:0;right:0;bottom:0;height:120px;display:flex;align-items:center;justify-content:space-around;background:linear-gradient(transparent,rgba(0,0,0,.65))}
+.shutter{width:72px;height:72px;border-radius:50%;border:4px solid #fff;display:grid;place-items:center}
+.shutter i{width:56px;height:56px;border-radius:50%;background:var(--red)}
+.round{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.14);display:grid;place-items:center;color:#fff}
+.round svg{width:22px;height:22px}
+.guide{position:absolute;inset:14% 7% 26% 7%;border:2px solid rgba(255,255,255,.55);border-radius:14px}
+.detect{position:absolute;left:12px;top:12px;font-size:12px;font-weight:600;background:rgba(31,33,38,.88);border:1px solid var(--line);border-radius:20px;padding:4px 10px;color:#fff}
+.detect b{color:var(--red)}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;height:34px;border:0;border-radius:7px;background:none;color:var(--muted);font-size:13px;font-weight:600}
+.seg button.on{background:var(--selected-bg);color:#fff;box-shadow:inset 0 0 0 1px var(--red)}
+.list{display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.item{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.item.sel{border-color:var(--red);box-shadow:inset 3px 0 0 var(--red);background:var(--selected-bg)}
+.item .o{font-size:12.5px;color:var(--muted);font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif}
+.item .t{font-size:15.5px;color:#fff;margin-top:2px}
+.sheet{flex:0 0 auto;max-height:46%;padding:10px 14px 0;display:flex;flex-direction:column;gap:10px;overflow:hidden;border-top:1px solid var(--line);background:var(--chrome)}
+
+/* inner (unfolded) */
+.split{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:0}
+.split>.l{position:relative;border-right:1px solid var(--line);overflow:hidden}
+.split>.r{padding:12px 16px 0;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+
+/* settings */
+.set{flex:1;overflow:hidden;padding:4px 16px 0}
+.grp{margin:0 0 18px}
+.lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.pack{display:flex;align-items:center;gap:10px;height:54px;border-bottom:1px solid var(--line)}
+.pack:last-child{border-bottom:0}
+.pack .nm{flex:1;font-size:15px;color:#fff}
+.pack .nm small{display:block;color:var(--muted);font-size:11.5px}
+.btn{height:36px;padding:0 14px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.btn.pri{background:var(--red);border-color:var(--red);color:#fff}
+.ok{color:var(--green);font-weight:700;font-size:13px}
+.bar{height:4px;border-radius:4px;background:#3a3e46;overflow:hidden;width:90px}
+.bar i{display:block;height:100%;width:62%;background:var(--red)}
+.field{height:46px;border-radius:10px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;padding:0 12px;color:#6B707A;font-size:14px}
+.hint{color:var(--muted);font-size:12px;margin:6px 0 0}
+.tgl{width:40px;height:24px;border-radius:20px;background:var(--red);position:relative;flex:0 0 auto}
+.tgl::after{content:'';position:absolute;right:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff}
+.swrow{display:flex;align-items:center;gap:12px;font-size:15px;color:#fff}
+.swrow>span:first-child{flex:1}.swrow small{display:block;color:var(--muted);font-size:11.5px}
+.ver{display:flex;align-items:center;gap:8px;font-size:15px;color:#fff}
+.ver .sp{flex:1}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>MTrans Mobile · Preview layout (Z Fold 7)</h1>
+  <p class="lead">App Android riêng: dịch Tiếng Việt / Tiếng Anh / Tiếng Trung, chụp ảnh bằng camera, có dịch offline. Giao diện tối theo chuẩn Mondiro. Không có header logo: chỉ 1 hàng icon mỏng ở góc phải (kiểm tra cập nhật + chữ <span style="color:var(--green);font-weight:700">latest</span>). Thanh dưới có 3 tab: <b>Camera · Văn bản · Cài đặt</b>.</p>
+
+  <!-- 1 TEXT -->
+  <section class="sec">
+    <h2><span class="n">1</span>Dịch văn bản (màn ngoài)</h2>
+    <p>Hai ô chọn ngôn ngữ "Dịch từ" và "Dịch sang". Ngôn ngữ đã chọn ở "Dịch từ" sẽ không có trong danh sách "Dịch sang". Nút ⇄ đảo chiều. Gõ xong là tự dịch (không cần bấm nút). Mất mạng thì tự dịch offline và có chip vàng <b>Offline</b>.</p>
+    <div class="row">
+      <div><div class="phone outer"><div class="scr">
+        <div class="status"><span>9:41</span><span class="cam"></span><span>5G ▮▮▮ 82%</span></div>
+        <div class="topbar"><span class="latest">latest</span><button class="ib upd" title="Kiểm tra cập nhật"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button></div>
+        <div class="body">
+          <div class="langs">
+            <div class="lsel"><small>Dịch từ</small><b>Tiếng Trung <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></b></div>
+            <button class="swap" title="Đảo chiều"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg></button>
+            <div class="lsel"><small>Dịch sang</small><b>Tiếng Việt <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></b></div>
+          </div>
+          <div class="card inp">请问附近有地铁站吗？我想去博物馆。
+            <div class="tools">
+              <button class="ib" title="Dán"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg></button>
+              <button class="ib" title="Xoá"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            </div>
+          </div>
+          <div class="card res">Xin hỏi gần đây có ga tàu điện ngầm không? Tôi muốn đến bảo tàng.
+            <div class="meta"><span class="eng">Google</span><span class="sp"></span>
+              <button class="ib" title="Copy" style="width:34px;height:34px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+              <button class="lnk">Dịch với Claude</button></div>
+          </div>
+        </div>
+        <span class="credit">Created by Mondiro</span>
+        <div class="nav">
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
+          <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>Văn bản</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cài đặt</button>
+        </div>
+      </div></div><p class="cap">Có mạng: Google dịch</p></div>
+
+      <div><div class="phone outer"><div class="scr">
+        <div class="status"><span>9:41</span><span class="cam"></span><span>✈ 82%</span></div>
+        <div class="topbar"><span class="chip-off"><i></i>Offline</span><span class="latest">latest</span><button class="ib upd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button></div>
+        <div class="body">
+          <div class="langs">
+            <div class="lsel"><small>Dịch từ</small><b>Tiếng Anh <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></b></div>
+            <button class="swap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg></button>
+            <div class="lsel open"><small>Dịch sang</small><b>Tiếng Việt <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg></b>
+              <div class="menu"><div class="on">Tiếng Việt</div><div>Tiếng Trung</div></div></div>
+          </div>
+          <div class="card inp">Where is the nearest train station?</div>
+          <div class="card res">Ga tàu gần nhất ở đâu?
+            <div class="meta"><span class="eng off">Offline</span><span class="sp"></span><span class="by">Có mạng lại sẽ tự dịch lại</span></div>
+          </div>
+        </div>
+        <span class="credit">Created by Mondiro</span>
+        <div class="nav">
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
+          <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>Văn bản</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Cài đặt</button>
+        </div>
+      </div></div><p class="cap">Mất mạng + mở menu "Dịch sang": không còn Tiếng Anh</p></div>
+
+      <div class="note"><b>Quy tắc chọn ngôn ngữ</b>
+        <ul>
+          <li>"Dịch từ": Tiếng Việt / Tiếng Anh / Tiếng Trung.</li>
+          <li>"Dịch sang": chỉ hiện 2 ngôn ngữ còn lại.</li>
+          <li>Đổi "Dịch từ" sang đúng ngôn ngữ đang ở "Dịch sang" thì "Dịch sang" tự đổi sang ngôn ngữ khác.</li>
+          <li>Nút ⇄ đảo chiều, đồng thời đưa bản dịch lên ô nhập.</li>
+          <li>Có nút copy bản dịch và nút dán vào ô nhập.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 CAMERA -->
+  <section class="sec">
+    <h2><span class="n">2</span>Camera (màn ngoài): chụp → tự nhận ngôn ngữ → dịch sang Tiếng Việt</h2>
+    <p>Bấm nút chụp đỏ (hoặc nút ảnh để chọn ảnh có sẵn trong máy). Ảnh đứng lại, các đoạn chữ được khoanh khung đỏ, góc trên báo ngôn ngữ đã nhận ra. Có 2 kiểu xem, chuyển bằng nút trên đầu: <b>Danh sách</b> (chạm 1 khung để làm nổi đoạn đó) và <b>Đè lên ảnh</b> (chữ Việt vẽ đè đúng chỗ chữ gốc, như Google Lens).</p>
+    <div class="row">
+      <div><div class="phone outer"><div class="scr">
+        <div class="status"><span>9:41</span><span class="cam"></span><span>5G 82%</span></div>
+        <div class="view">
+          <div class="shot"><div class="sign s1">博物馆 出口</div><div class="sign s2">牛肉面 <i>¥28</i><br>小笼包 <i>¥18</i><br>请勿吸烟</div><div class="sign s3">← 地铁站 200米</div></div>
+          <div class="guide"></div>
+          <div class="vfui">
+            <div class="round" title="Chọn ảnh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div>
+            <div class="shutter"><i></i></div>
+            <div class="round" title="Đèn flash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg></div>
+          </div>
+        </div>
+        <div class="nav">
+          <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>Văn bản</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Cài đặt</button>
+        </div>
+      </div></div><p class="cap">Khung ngắm</p></div>
+
+      <div><div class="phone outer"><div class="scr">
+        <div class="status"><span>9:41</span><span class="cam"></span><span>5G 82%</span></div>
+        <div class="view" style="flex:0 0 52%">
+          <div class="shot"><div class="sign s1">博物馆 出口</div><div class="sign s2">牛肉面 <i>¥28</i><br>小笼包 <i>¥18</i><br>请勿吸烟</div><div class="sign s3">← 地铁站 200米</div></div>
+          <div class="box" style="left:7%;top:8%;width:62%;height:15%"></div>
+          <div class="box sel" style="left:9%;top:30%;width:82%;height:31%"></div>
+          <div class="box" style="left:43%;top:69%;width:50%;height:12%"></div>
+          <span class="detect">Đã nhận ra: <b>Tiếng Trung</b> → Tiếng Việt</span>
+        </div>
+        <div class="sheet">
+          <div class="seg"><button class="on">Danh sách</button><button>Đè lên ảnh</button></div>
+          <div class="list">
+            <div class="item"><div class="o">博物馆 出口</div><div class="t">Bảo tàng · Lối ra</div></div>
+            <div class="item sel"><div class="o">牛肉面 ¥28 · 小笼包 ¥18 · 请勿吸烟</div><div class="t">Mì bò ¥28 · Bánh bao nhỏ ¥18 · Vui lòng không hút thuốc</div></div>
+          </div>
+        </div>
+        <div class="nav">
+          <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>Văn bản</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Cài đặt</button>
+        </div>
+      </div></div><p class="cap">Đã chụp: kiểu Danh sách (vuốt lên để xem hết)</p></div>
+
+      <div><div class="phone outer"><div class="scr">
+        <div class="status"><span>9:41</span><span class="cam"></span><span>5G 82%</span></div>
+        <div class="view">
+          <div class="shot"><div class="sign s1">博物馆 出口</div><div class="sign s2">牛肉面 <i>¥28</i><br>小笼包 <i>¥18</i><br>请勿吸烟</div><div class="sign s3">← 地铁站 200米</div></div>
+          <div class="over" style="left:6%;top:7%;width:66%;height:17%;font-size:20px">Bảo tàng · Lối ra</div>
+          <div class="over" style="left:8%;top:30%;width:84%;height:33%;font-size:15px;align-items:flex-start;padding-top:8px">Mì bò ¥28<br>Bánh bao nhỏ ¥18<br>Không hút thuốc</div>
+          <div class="over" style="left:40%;top:68%;width:55%;height:13%;font-size:14px">← Ga tàu điện 200m</div>
+          <span class="detect">Tiếng Trung → <b>Tiếng Việt</b></span>
+          <div class="vfui" style="height:96px">
+            <div class="seg" style="width:78%;background:rgba(31,33,38,.9)"><button>Danh sách</button><button class="on">Đè lên ảnh</button></div>
+          </div>
+        </div>
+        <div class="nav">
+          <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>Văn bản</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Cài đặt</button>
+        </div>
+      </div></div><p class="cap">Kiểu Đè lên ảnh (giữ ngón tay để xem chữ gốc)</p></div>
+    </div>
+  </section>
+
+  <!-- 3 INNER -->
+  <section class="sec">
+    <h2><span class="n">3</span>Mở máy ra (màn trong ~8"): chia đôi màn hình</h2>
+    <p>Ảnh bên trái, bản dịch bên phải: chạm khung bên trái thì đoạn tương ứng bên phải sáng lên, và ngược lại. Gập/mở máy không mất ảnh hay bản dịch đang xem. Tab Văn bản trên màn trong: ô nhập bên trái, bản dịch bên phải.</p>
+    <div class="row">
+      <div><div class="phone inner"><div class="scr">
+        <div class="status"><span>9:41</span><span class="cam"></span><span>5G 82%</span></div>
+        <div class="topbar"><span class="latest">latest</span><button class="ib upd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button></div>
+        <div class="split">
+          <div class="l view">
+            <div class="shot"><div class="sign s1">博物馆 出口</div><div class="sign s2">牛肉面 <i>¥28</i><br>小笼包 <i>¥18</i><br>请勿吸烟</div><div class="sign s3">← 地铁站 200米</div></div>
+            <div class="box" style="left:7%;top:8%;width:62%;height:14%"></div>
+            <div class="box" style="left:9%;top:30%;width:82%;height:30%"></div>
+            <div class="box sel" style="left:43%;top:69%;width:50%;height:11%"></div>
+            <span class="detect">Đã nhận ra: <b>Tiếng Trung</b></span>
+            <div class="vfui" style="height:90px">
+              <div class="round"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div>
+              <div class="shutter" style="width:60px;height:60px"><i style="width:46px;height:46px"></i></div>
+              <div class="round"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.5 9A9 9 0 0 0 5.6 5.6L1 10m22 4l-4.6 4.4A9 9 0 0 1 3.5 15"/></svg></div>
+            </div>
+          </div>
+          <div class="r">
+            <div class="seg"><button class="on">Danh sách</button><button>Đè lên ảnh</button></div>
+            <div class="list">
+              <div class="item"><div class="o">博物馆 出口</div><div class="t">Bảo tàng · Lối ra</div></div>
+              <div class="item"><div class="o">牛肉面 ¥28 · 小笼包 ¥18 · 请勿吸烟</div><div class="t">Mì bò ¥28 · Bánh bao nhỏ ¥18 · Vui lòng không hút thuốc</div></div>
+              <div class="item sel"><div class="o">← 地铁站 200米</div><div class="t">← Ga tàu điện ngầm 200 m</div></div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:6px;align-items:center"><span class="eng">Google</span><button class="lnk">Dịch với Claude</button></div>
+          </div>
+        </div>
+        <span class="credit">Created by Mondiro</span>
+        <div class="nav">
+          <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>Văn bản</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Cài đặt</button>
+        </div>
+      </div></div><p class="cap">Màn trong: ảnh trái, bản dịch phải</p></div>
+    </div>
+  </section>
+
+  <!-- 4 SETTINGS -->
+  <section class="sec">
+    <h2><span class="n">4</span>Cài đặt</h2>
+    <p>Tải gói dịch offline cho từng ngôn ngữ (mỗi gói ~30MB, tải 1 lần). Claude API key để dùng nút "Dịch với Claude" (không nhập thì dùng Google). Phiên bản + What's new + kiểm tra cập nhật. "Created by Mondiro" ở góc dưới phải.</p>
+    <div class="row">
+      <div><div class="phone outer"><div class="scr">
+        <div class="status"><span>9:41</span><span class="cam"></span><span>5G 82%</span></div>
+        <div class="topbar"><span class="latest">latest</span><button class="ib upd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button></div>
+        <div class="set">
+          <div class="grp"><span class="lbl">Gói dịch offline</span>
+            <div class="pack"><span class="nm">Tiếng Việt<small>29 MB</small></span><span class="ok">✓ Đã tải</span></div>
+            <div class="pack"><span class="nm">Tiếng Anh<small>Có sẵn</small></span><span class="ok">✓ Đã tải</span></div>
+            <div class="pack"><span class="nm">Tiếng Trung<small>Đang tải… 62%</small></span><span class="bar"><i></i></span></div>
+            <p class="hint">Chỉ tải qua Wi-Fi. Có mạng thì MTrans vẫn dùng Google cho bản dịch tốt hơn.</p>
+          </div>
+          <div class="grp"><span class="lbl">Claude API key</span>
+            <div class="field">Dán API key để dùng "Dịch với Claude"</div>
+            <p class="hint">Không nhập key thì dịch bằng Google (và offline khi mất mạng).</p>
+          </div>
+          <div class="grp"><div class="swrow"><span>Luôn dịch offline<small>Không gửi chữ lên mạng</small></span><span class="tgl" style="background:#474C55"></span></div></div>
+          <div class="grp"><span class="lbl">Phiên bản</span>
+            <div class="ver"><b>v1.0.0</b><span class="latest">latest</span><span class="sp"></span><button class="btn">✦ What's new</button></div>
+          </div>
+        </div>
+        <span class="credit">Created by Mondiro</span>
+        <div class="nav">
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>Văn bản</button>
+          <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Cài đặt</button>
+        </div>
+      </div></div></div>
+      <div class="note"><b>Thêm ngoài yêu cầu (tuỳ bạn):</b>
+        <ul>
+          <li><b>Luôn dịch offline</b>: bật lên thì chữ và ảnh không bao giờ gửi lên mạng (riêng tư).</li>
+          <li>Ảnh chụp chỉ dùng để dịch, không lưu vào thư viện ảnh.</li>
+          <li>Icon app dùng chung logo MTrans (bản không chữ), dạng adaptive icon của Android.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
